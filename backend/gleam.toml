@@ -20,6 +20,7 @@ gleam_erlang = "~> 0.25"
 mist = "~> 1.0"
 gleam_http = "~> 3.6"
 gleam_hackney = "~> 1.2"
+gleam_httpc = "~> 2.2"
 
 [dev-dependencies]
 gleeunit = "~> 1.0"
