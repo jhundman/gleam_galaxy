@@ -1,0 +1,11 @@
+SCHEMA >
+    `package_name` String,
+    `release` String,
+    `release_downloads` UInt64,
+    `url` String,
+    `released_at` DateTime64(6, 'UTC'),
+    `inserted_at` DateTime64(6, 'UTC') DEFAULT now64(6, 'UTC')
+
+ENGINE ReplacingMergeTree
+ENGINE_SORTING_KEY package_name, release
+ENGINE_VER released_at

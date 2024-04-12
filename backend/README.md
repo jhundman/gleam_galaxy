@@ -1,20 +1,20 @@
-# sunstone
+# galaxy
 
-[![Package Version](https://img.shields.io/hexpm/v/sunstone)](https://hex.pm/packages/sunstone)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/sunstone/)
+[![Package Version](https://img.shields.io/hexpm/v/galaxy)](https://hex.pm/packages/galaxy)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/galaxy/)
 
 ```sh
-gleam add sunstone
+gleam add galaxy
 ```
 ```gleam
-import sunstone
+import galaxy
 
 pub fn main() {
   // TODO: An example of the project in use
 }
 ```
 
-Further documentation can be found at <https://hexdocs.pm/sunstone>.
+Further documentation can be found at <https://hexdocs.pm/galaxy>.
 
 ## Development
 

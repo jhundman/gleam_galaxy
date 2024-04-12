@@ -1,0 +1,14 @@
+SCHEMA >
+    `package_name` String,
+    `hex_url` String,
+    `description` String,
+    `licenses` Array(String),
+    `repository_url` String,
+    `downloads_all_time` UInt64,
+    `hex_updated_at` DateTime64(6, 'UTC')
+    `hex_inserted_at` DateTime64(6, 'UTC')
+    `inserted_at` DateTime64(6, 'UTC') DEFAULT now64(6, 'UTC')
+
+ENGINE ReplacingMergeTree
+ENGINE_SORTING_KEY package_name, hex_inserted_at
+ENGINE_VER hex_inserted_at

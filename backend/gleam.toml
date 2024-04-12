@@ -1,4 +1,4 @@
-name = "sunstone"
+name = "galaxy"
 version = "1.0.0"
 
 # Fill out these fields if you intend to generate HTML documentation or publish
@@ -14,13 +14,6 @@ version = "1.0.0"
 
 [dependencies]
 gleam_stdlib = "~> 0.34 or ~> 1.0"
-wisp = "~> 0.14"
-gleam_json = "~> 1.0"
-gleam_erlang = "~> 0.25"
-mist = "~> 1.0"
-gleam_http = "~> 3.6"
-gleam_hackney = "~> 1.2"
-gleam_httpc = "~> 2.2"
 
 [dev-dependencies]
 gleeunit = "~> 1.0"

@@ -1,0 +1,10 @@
+SCHEMA >
+    `package_name` String,
+    `downloads_yesterday` UInt32
+    `date` Date32
+    `inserted_at` DateTime64(6, 'UTC') DEFAULT now64(6, 'UTC')
+
+
+ENGINE ReplacingMergeTree
+ENGINE_SORTING_KEY package_name, date
+ENGINE_VER inserted_at
