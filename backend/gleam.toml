@@ -23,6 +23,8 @@ birl = "~> 1.6"
 gleam_otp = "~> 0.10"
 shakespeare = "~> 0.1"
 glenvy = "~> 0.6"
+gleam_hexpm = "~> 1.0"
+gleam_hackney = "~> 1.2"
 
 [dev-dependencies]
 gleeunit = "~> 1.0"
