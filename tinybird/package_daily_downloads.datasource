@@ -1,8 +1,8 @@
 SCHEMA >
-    `package_name` String,
-    `downloads_yesterday` UInt32
-    `date` Date32
-    `inserted_at` DateTime64(6, 'UTC') DEFAULT now64(6, 'UTC')
+    `package_name` String `json:$.package_name`,
+    `downloads_yesterday` UInt32 `json:$.downloads_yesterday`,
+    `date` Date32 `json:$.date`,
+    `inserted_at` DateTime64(6, 'UTC') `json:$.inserted_at`
 
 
 ENGINE ReplacingMergeTree

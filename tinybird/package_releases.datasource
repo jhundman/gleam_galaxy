@@ -1,10 +1,10 @@
 SCHEMA >
-    `package_name` String,
-    `release` String,
-    `release_downloads` UInt64,
-    `url` String,
-    `released_at` DateTime64(6, 'UTC'),
-    `inserted_at` DateTime64(6, 'UTC') DEFAULT now64(6, 'UTC')
+    `package_name` String `json:$.package_name`,
+    `release` String `json:$.release`,
+    `release_downloads` UInt64 `json:$.release_downloads`,
+    `url` String `json:$.url`,
+    `released_at` String `json:$.released_at`,
+    `inserted_at` String `json:$.inserted_at`
 
 ENGINE ReplacingMergeTree
 ENGINE_SORTING_KEY package_name, release

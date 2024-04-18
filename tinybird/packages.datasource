@@ -1,14 +1,15 @@
 SCHEMA >
-    `package_name` String,
-    `hex_url` String,
-    `description` String,
-    `licenses` Array(String),
-    `repository_url` String,
-    `downloads_all_time` UInt64,
-    `hex_updated_at` DateTime64(6, 'UTC')
-    `hex_inserted_at` DateTime64(6, 'UTC')
-    `inserted_at` DateTime64(6, 'UTC') DEFAULT now64(6, 'UTC')
+    `package_name` String `json:$.package_name`,
+    `hex_url` String `json:$.hex_url`,
+    `description` String `json:$.description`,
+    `licenses` Array(String) `json:$.licenses[:]`,
+    `repository_url` String `json:$.repository_url`,
+    `owners` Array(String) `json:$.owners[:]`,
+    `downloads_all_time` Int32 `json:$.downloads_all_time`,
+    `hex_updated_at` String `json:$.hex_updated_at`,
+    `hex_inserted_at` String `json:$.hex_inserted_at`,
+    `inserted_at` String `json:$.inserted_at`
 
 ENGINE ReplacingMergeTree
-ENGINE_SORTING_KEY package_name, hex_inserted_at
-ENGINE_VER hex_inserted_at
+ENGINE_SORTING_KEY package_name
+ENGINE_VER hex_updated_at

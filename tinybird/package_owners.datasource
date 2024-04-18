@@ -1,9 +1,0 @@
-SCHEMA >
-    `package_name` String,
-    `owner_name` String,
-    `owner_url` String,
-    `inserted_at` DateTime64(6, 'UTC') DEFAULT now64(6, 'UTC')
-
-ENGINE ReplacingMergeTree
-ENGINE_SORTING_KEY package_name, owner_name
-ENGINE_VER inserted_at
