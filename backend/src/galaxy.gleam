@@ -1,12 +1,13 @@
-import galaxy/router
 import dot_env
+import galaxy/router
+import galaxy/sync.{start_cron}
+import gleam/erlang/process
+import gleam/io
+import gleam/result.{try}
 import glenvy/dotenv
 import glenvy/env
 import mist
 import wisp
-import gleam/erlang/process
-import galaxy/hex_cron.{start_cron}
-import gleam/result.{try}
 
 // import gleam/io
 
