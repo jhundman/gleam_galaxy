@@ -1,30 +1,23 @@
 import birl.{type Time}
 import birl/duration
 import galaxy/error.{type Error}
+import galaxy/state.{type State}
+import galaxy/tinybird/tinybird.{type Meta, type Statistics}
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic, DecodeError} as dyn
 import gleam/dynamic
 import gleam/function
 import gleam/hackney
-import gleam/hexpm
+import gleam/hexpm.{type Package}
 import gleam/http/request
 import gleam/int
 import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None}
-import gleam/order
+import pprint as pp
+
 import gleam/result
-import gleam/string
-import gleam/uri
-
-pub type Statistics {
-  Statistics(elapsed: Float, rows_read: Int, bytes_read: Int)
-}
-
-pub type Meta {
-  Meta(name: String, data_type: String)
-}
 
 pub type UpdateData {
   UpdateData(max_updated_at: String)
@@ -39,7 +32,7 @@ pub type MaxUpdate {
   )
 }
 
-fn decode_max_package_updated_at(
+pub fn decode_max_package_updated_at(
   data: Dynamic,
 ) -> Result(MaxUpdate, List(DecodeError)) {
   dyn.decode4(
@@ -47,7 +40,7 @@ fn decode_max_package_updated_at(
     dyn.field(
       "meta",
       dyn.list(dyn.decode2(
-        Meta,
+        tinybird.Meta,
         dyn.field("name", dyn.string),
         dyn.field("type", dyn.string),
       )),
@@ -60,7 +53,7 @@ fn decode_max_package_updated_at(
     dyn.field(
       "statistics",
       dyn.decode3(
-        Statistics,
+        tinybird.Statistics,
         dyn.field("elapsed", dyn.float),
         dyn.field("rows_read", dyn.int),
         dyn.field("bytes_read", dyn.int),
@@ -86,7 +79,7 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
 
   let time = case list.first(max_update.data) {
     Ok(t) -> t.max_updated_at
-    Error(_) -> "Error"
+    Error(_) -> " "
   }
 
   let latest_ts =
@@ -98,4 +91,27 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
   |> birl.subtract(duration.days(5))
   |> io.debug()
   |> Ok()
+}
+
+// Insert Package
+pub fn create_package_json(pkg: Package, state: State) {
+  let downloads =
+    pkg.downloads
+    |> dict.get("all")
+    |> result.unwrap(0)
+  let x = {
+    json.object([
+      #("package_name", json.string(pkg.name)),
+      #("hex_url", json.string(option.unwrap(pkg.html_url, ""))),
+      #("description", json.string(option.unwrap(pkg.meta.description, ""))),
+      #("licenses", json.string("")),
+      #("repository_url", json.string("")),
+      #("downloads_all_time", json.string("")),
+      #("hex_updated_at", json.string("")),
+      #("hex_inserted_at", json.string("")),
+      #("inserted_at", json.string("")),
+    ])
+  }
+  json.to_string(x)
+  |> io.debug()
 }

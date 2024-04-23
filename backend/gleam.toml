@@ -28,3 +28,4 @@ gleam_hackney = "~> 1.2"
 
 [dev-dependencies]
 gleeunit = "~> 1.0"
+pprint = ">= 1.0.2 and < 2.0.0"
