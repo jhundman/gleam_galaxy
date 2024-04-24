@@ -1,20 +1,18 @@
 import birl.{type Time}
 import birl/duration
+import galaxy/cron/hex
+import galaxy/cron/tinybird
 import galaxy/error.{type Error}
 import galaxy/state.{type State}
-import galaxy/tinybird/sync
+import gleam/dict
 import gleam/dynamic
 import gleam/hackney
-import gleam/hexpm
-import gleam/http/request
+import gleam/hexpm.{type Package}
 import gleam/int
 import gleam/io
 import gleam/json
-import gleam/list
-import gleam/order
+import gleam/option
 import gleam/result
-import gleam/string
-import gleam/uri
 import pprint as pp
 import shakespeare/actors/periodic.{Ms, start}
 import wisp
@@ -29,12 +27,15 @@ pub fn try(a: Result(a, e), f: fn(a) -> Result(b, e)) -> Result(b, e) {
 pub fn start_cron(hex_key: String, tinybird_key: String) {
   wisp.log_info("Start Scheduler")
 
-  let latest_ts = case sync.get_max_package_updated_at(tinybird_key) {
+  let latest_ts = tinybird.get_max_package_updated_at(tinybird_key)
+
+  let latest_ts = case latest_ts {
     Ok(t) -> t
     Error(_) ->
       birl.utc_now()
       |> birl.subtract(duration.years(5))
   }
+
   io.println("\nLatest TS")
   pp.debug(latest_ts)
 
@@ -46,8 +47,6 @@ pub fn start_cron(hex_key: String, tinybird_key: String) {
       tinybird_key: tinybird_key,
       updated_at: birl.utc_now(),
     )
-
-  // io.debug(state)
 
   let cron = fn() { do_cron(s) }
   start(do: cron, every: Ms(10_000))
@@ -61,12 +60,60 @@ fn do_cron(state: State) -> Nil {
   wisp.log_info("Start Cron Job at: " <> utc)
   pp.debug(state)
 
-  let assert Ok(wisp) = fetch_package("wisp", state.hex_key)
-  let wisp = sync.create_package_json(wisp, state)
+  let assert Ok(wisp) = hex.fetch_package("wisp", state.hex_key)
+  let wisp_data = create_package_json(wisp, state)
+  tinybird.insert_data_tb(wisp_data, state.tinybird_key, "packages")
 
   Nil
 }
 
+pub fn create_package_json(pkg: Package, state: State) {
+  let downloads =
+    pkg.downloads
+    |> dict.get("all")
+    |> result.unwrap(0)
+    |> json.int()
+
+  let repo_url =
+    pkg.meta.links
+    |> dict.get("Repository")
+    |> result.unwrap("")
+    |> json.string()
+
+  let hex_updated_at =
+    pkg.updated_at
+    |> birl.to_iso8601()
+    |> json.string()
+
+  let hex_inserted_at =
+    pkg.inserted_at
+    |> birl.to_iso8601()
+    |> json.string()
+
+  let state_upated_at =
+    state.updated_at
+    |> birl.to_iso8601()
+    |> json.string()
+
+  // io.debug(pkg)
+
+  let x = {
+    json.object([
+      #("package_name", json.string(pkg.name)),
+      #("hex_url", json.string(option.unwrap(pkg.html_url, ""))),
+      #("description", json.string(option.unwrap(pkg.meta.description, ""))),
+      #("licenses", json.array(pkg.meta.licenses, of: json.string)),
+      #("repository_url", repo_url),
+      #("owners", json.array([], of: json.string)),
+      #("downloads_all_time", downloads),
+      #("hex_updated_at", hex_updated_at),
+      #("hex_inserted_at", hex_inserted_at),
+      #("inserted_at", state_upated_at),
+    ])
+  }
+  json.to_string(x)
+  |> io.debug()
+}
 // fn sync_packages(state: State) {
 //   todo
 // }
@@ -112,23 +159,6 @@ fn do_cron(state: State) -> Nil {
 //   todo
 // }
 
-fn fetch_package(package_name: String, hex_key: String) {
-  use response <- result.try(
-    request.new()
-    |> request.set_host("hex.pm")
-    |> request.set_path("/api/packages/" <> package_name)
-    |> request.prepend_header("authorization", hex_key)
-    |> hackney.send
-    |> result.map_error(error.HttpClientError),
-  )
-
-  use package <- result.try(
-    json.decode(response.body, using: hexpm.decode_package)
-    |> result.map_error(error.JsonDecodeError),
-  )
-
-  Ok(package)
-}
 // // fetch_package("wisp", state.hex_key)
 // // let release =
 // //   hexpm.PackageRelease(

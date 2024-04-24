@@ -1,23 +1,22 @@
-import birl.{type Time}
+import birl
 import birl/duration
-import galaxy/error.{type Error}
-import galaxy/state.{type State}
-import galaxy/tinybird/tinybird.{type Meta, type Statistics}
-import gleam/dict.{type Dict}
+import galaxy/error
 import gleam/dynamic.{type DecodeError, type Dynamic, DecodeError} as dyn
-import gleam/dynamic
-import gleam/function
 import gleam/hackney
-import gleam/hexpm.{type Package}
+import gleam/http.{type Method}
 import gleam/http/request
-import gleam/int
 import gleam/io
 import gleam/json
 import gleam/list
-import gleam/option.{type Option, None}
-import pprint as pp
-
 import gleam/result
+
+pub type Statistics {
+  Statistics(elapsed: Float, rows_read: Int, bytes_read: Int)
+}
+
+pub type Meta {
+  Meta(name: String, data_type: String)
+}
 
 pub type UpdateData {
   UpdateData(max_updated_at: String)
@@ -40,7 +39,7 @@ pub fn decode_max_package_updated_at(
     dyn.field(
       "meta",
       dyn.list(dyn.decode2(
-        tinybird.Meta,
+        Meta,
         dyn.field("name", dyn.string),
         dyn.field("type", dyn.string),
       )),
@@ -53,7 +52,7 @@ pub fn decode_max_package_updated_at(
     dyn.field(
       "statistics",
       dyn.decode3(
-        tinybird.Statistics,
+        Statistics,
         dyn.field("elapsed", dyn.float),
         dyn.field("rows_read", dyn.int),
         dyn.field("bytes_read", dyn.int),
@@ -94,24 +93,19 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
 }
 
 // Insert Package
-pub fn create_package_json(pkg: Package, state: State) {
-  let downloads =
-    pkg.downloads
-    |> dict.get("all")
-    |> result.unwrap(0)
-  let x = {
-    json.object([
-      #("package_name", json.string(pkg.name)),
-      #("hex_url", json.string(option.unwrap(pkg.html_url, ""))),
-      #("description", json.string(option.unwrap(pkg.meta.description, ""))),
-      #("licenses", json.string("")),
-      #("repository_url", json.string("")),
-      #("downloads_all_time", json.string("")),
-      #("hex_updated_at", json.string("")),
-      #("hex_inserted_at", json.string("")),
-      #("inserted_at", json.string("")),
-    ])
-  }
-  json.to_string(x)
-  |> io.debug()
+
+pub fn insert_data_tb(body: String, tinybird_key: String, table_name: String) {
+  use response <- result.try(
+    request.new()
+    |> request.set_method(http.Post)
+    |> request.set_host("api.us-east.tinybird.co")
+    |> request.set_path("/v0/events")
+    |> request.prepend_header("Authorization", "Bearer " <> tinybird_key)
+    |> request.set_query([#("name", table_name)])
+    |> request.set_body(body)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+  io.debug(response)
+  Ok(Nil)
 }

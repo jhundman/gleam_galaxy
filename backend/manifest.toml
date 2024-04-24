@@ -56,11 +56,13 @@ envoy = { version = "~> 1.0" }
 gleam_erlang = { version = "~> 0.25" }
 gleam_hackney = { version = "~> 1.2" }
 gleam_hexpm = { version = "~> 1.0" }
+gleam_http = { version = ">= 3.6.0 and < 4.0.0"}
+gleam_json = { version = ">= 1.0.0 and < 2.0.0" }
 gleam_otp = { version = "~> 0.10" }
 gleam_stdlib = { version = "~> 0.34 or ~> 1.0" }
 gleeunit = { version = "~> 1.0" }
 glenvy = { version = "~> 0.6" }
 mist = { version = "~> 1.0" }
-pprint = { version = ">= 1.0.2 and < 2.0.0"}
+pprint = { version = ">= 1.0.2 and < 2.0.0" }
 shakespeare = { version = "~> 0.1" }
 wisp = { version = "~> 0.14" }
