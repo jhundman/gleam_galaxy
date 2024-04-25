@@ -61,13 +61,18 @@ fn do_cron(state: State) -> Nil {
   pp.debug(state)
 
   let assert Ok(wisp) = hex.fetch_package("wisp", state.hex_key)
-  let wisp_data = create_package_json(wisp, state)
-  tinybird.insert_data_tb(wisp_data, state.tinybird_key, "packages")
+  let download_data = create_download_json(wisp)
+  // let wisp_data = create_package_json(wisp)
+  tinybird.insert_data_tb(
+    download_data,
+    state.tinybird_key,
+    "package_daily_downloads",
+  )
 
   Nil
 }
 
-pub fn create_package_json(pkg: Package, state: State) {
+pub fn create_package_json(pkg: Package) {
   let downloads =
     pkg.downloads
     |> dict.get("all")
@@ -90,8 +95,8 @@ pub fn create_package_json(pkg: Package, state: State) {
     |> birl.to_iso8601()
     |> json.string()
 
-  let state_upated_at =
-    state.updated_at
+  let inserted_at =
+    birl.utc_now()
     |> birl.to_iso8601()
     |> json.string()
 
@@ -108,7 +113,38 @@ pub fn create_package_json(pkg: Package, state: State) {
       #("downloads_all_time", downloads),
       #("hex_updated_at", hex_updated_at),
       #("hex_inserted_at", hex_inserted_at),
-      #("inserted_at", state_upated_at),
+      #("inserted_at", inserted_at),
+    ])
+  }
+  json.to_string(x)
+  |> io.debug()
+}
+
+pub fn create_download_json(pkg: Package) {
+  let downloads =
+    pkg.downloads
+    |> dict.get("day")
+    |> result.unwrap(0)
+    |> json.int()
+
+  let date =
+    birl.utc_now()
+    |> birl.to_naive_date_string()
+    |> json.string()
+
+  let inserted_at =
+    birl.utc_now()
+    |> birl.to_iso8601()
+    |> json.string()
+
+  // io.debug(pkg)
+
+  let x = {
+    json.object([
+      #("package_name", json.string(pkg.name)),
+      #("downloads_yesterday", downloads),
+      #("date", date),
+      #("inserted_at", inserted_at),
     ])
   }
   json.to_string(x)

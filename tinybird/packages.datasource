@@ -12,4 +12,4 @@ SCHEMA >
 
 ENGINE ReplacingMergeTree
 ENGINE_SORTING_KEY package_name
-ENGINE_VER hex_updated_at
+ENGINE_VER inserted_at
