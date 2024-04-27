@@ -9,6 +9,7 @@ import gleam/io
 import gleam/json
 import gleam/list
 import gleam/result
+import pprint as pp
 
 pub type Statistics {
   Statistics(elapsed: Float, rows_read: Int, bytes_read: Int)
@@ -61,6 +62,7 @@ pub fn decode_max_package_updated_at(
   )(data)
 }
 
+/// Returns max time from packages table minus 8 hours in case a job failed
 pub fn get_max_package_updated_at(tinybird_key: String) {
   use response <- result.try(
     request.new()
@@ -76,19 +78,80 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
     |> result.map_error(error.JsonDecodeError),
   )
 
-  let time = case list.first(max_update.data) {
-    Ok(t) -> t.max_updated_at
-    Error(_) -> " "
+  let max_time = case list.first(max_update.data) {
+    Ok(t) -> birl.parse(t.max_updated_at)
+    Error(_) -> Ok(birl.utc_now())
   }
 
-  let latest_ts =
-    birl.utc_now()
-    |> birl.subtract(duration.years(5))
-
-  birl.parse(time)
-  |> result.unwrap(latest_ts)
-  |> birl.subtract(duration.days(5))
+  max_time
+  |> result.unwrap(birl.utc_now())
+  |> birl.subtract(duration.hours(8))
   |> io.debug()
+  |> Ok()
+}
+
+// Get Gleam Packages
+pub type PackageName {
+  PackageName(package: String)
+}
+
+pub type ListOfPackages {
+  ListOfPackages(
+    meta: List(Meta),
+    data: List(PackageName),
+    rows: Int,
+    statistics: Statistics,
+  )
+}
+
+fn decode_gleam_packages(
+  data: Dynamic,
+) -> Result(ListOfPackages, List(DecodeError)) {
+  io.println("START DECODE")
+  dyn.decode4(
+    ListOfPackages,
+    dyn.field(
+      "meta",
+      dyn.list(dyn.decode2(
+        Meta,
+        dyn.field("name", dyn.string),
+        dyn.field("type", dyn.string),
+      )),
+    ),
+    dyn.field(
+      "data",
+      dyn.list(dyn.decode1(PackageName, dyn.field("package_name", dyn.string))),
+    ),
+    dyn.field("rows", dyn.int),
+    dyn.field(
+      "statistics",
+      dyn.decode3(
+        Statistics,
+        dyn.field("elapsed", dyn.float),
+        dyn.field("rows_read", dyn.int),
+        dyn.field("bytes_read", dyn.int),
+      ),
+    ),
+  )(data)
+}
+
+pub fn get_gleam_packages(tinybird_key: String) {
+  use response <- result.try(
+    request.new()
+    |> request.set_host("api.us-east.tinybird.co")
+    |> request.set_path("/v0/pipes/list_of_packages.json")
+    |> request.prepend_header("Authorization", "Bearer " <> tinybird_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+
+  use package_list <- result.try(
+    json.decode(response.body, using: decode_gleam_packages)
+    |> result.map_error(error.JsonDecodeError),
+  )
+
+  package_list.data
+  |> list.map(fn(x) { x.package })
   |> Ok()
 }
 
