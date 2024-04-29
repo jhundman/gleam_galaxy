@@ -2,6 +2,6 @@
 	import '../app.pcss';
 </script>
 
-<div class="min-h-screen">
+<div class="mx-auto flex max-w-screen-lg justify-center border-2 p-6">
 	<slot></slot>
 </div>
