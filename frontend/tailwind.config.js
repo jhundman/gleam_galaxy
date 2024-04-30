@@ -1,5 +1,3 @@
-import { fontFamily } from 'tailwindcss/defaultTheme';
-
 /** @type {import('tailwindcss').Config} */
 const config = {
 	darkMode: ['class'],
@@ -54,15 +52,15 @@ const config = {
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
 			},
-			fontFamily: {
-				sans: ['Lexend', ...fontFamily.sans]
-			},
 			minWidth: {
 				sm: '640px', // Default small breakpoint
 				md: '768px', // Default medium breakpoint
 				lg: '1024px', // Default large breakpoint
 				xl: '1280px', // Default extra-large breakpoint
 				'2xl': '1536px'
+			},
+			fontFamily: {
+				sans: ['Lexend', '-apple-system', 'sans-serif']
 			}
 		}
 	}

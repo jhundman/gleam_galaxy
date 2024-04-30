@@ -1,11 +1,3 @@
-@import '@fontsource/lexend/300.css';
-@import '@fontsource/lexend/400.css';
-@import '@fontsource/lexend/500.css';
-@import '@fontsource/lexend/600.css';
-@import '@fontsource/lexend/700.css';
-@import '@fontsource/lexend/800.css';
-@import '@fontsource/lexend/900.css';
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -72,15 +64,15 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 60 9.1% 97.8%;
 
-    --ring: 24 5.7% 82.9%;
+    --ring: 24 5.7% 8.9%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
 }
