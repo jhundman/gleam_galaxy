@@ -1,12 +1,8 @@
-import app/error
 import app/models.{type Meta, type Statistics}
-import gleam/dynamic.{type DecodeError, type Dynamic}
-import gleam/hackney
-import gleam/hexpm
-import gleam/http/request
-import gleam/json
-import gleam/result
+import gleam/dynamic.{type DecodeError, type Dynamic} as dyn
+import gleam/io
 
+// Max Updated At
 pub type UpdateData {
   UpdateData(max_updated_at: String)
 }
@@ -28,7 +24,7 @@ pub fn decode_max_package_updated_at(
     dyn.field(
       "meta",
       dyn.list(dyn.decode2(
-        Meta,
+        models.Meta,
         dyn.field("name", dyn.string),
         dyn.field("type", dyn.string),
       )),
@@ -41,7 +37,7 @@ pub fn decode_max_package_updated_at(
     dyn.field(
       "statistics",
       dyn.decode3(
-        Statistics,
+        models.Statistics,
         dyn.field("elapsed", dyn.float),
         dyn.field("rows_read", dyn.int),
         dyn.field("bytes_read", dyn.int),
@@ -50,7 +46,7 @@ pub fn decode_max_package_updated_at(
   )(data)
 }
 
-// Get Gleam Packages
+// Get List of Gleam Packages
 pub type PackageName {
   PackageName(package: String)
 }
@@ -64,7 +60,7 @@ pub type ListOfPackages {
   )
 }
 
-fn decode_gleam_packages(
+pub fn decode_gleam_packages(
   data: Dynamic,
 ) -> Result(ListOfPackages, List(DecodeError)) {
   io.println("START DECODE")
@@ -73,7 +69,7 @@ fn decode_gleam_packages(
     dyn.field(
       "meta",
       dyn.list(dyn.decode2(
-        Meta,
+        models.Meta,
         dyn.field("name", dyn.string),
         dyn.field("type", dyn.string),
       )),
@@ -86,7 +82,7 @@ fn decode_gleam_packages(
     dyn.field(
       "statistics",
       dyn.decode3(
-        Statistics,
+        models.Statistics,
         dyn.field("elapsed", dyn.float),
         dyn.field("rows_read", dyn.int),
         dyn.field("bytes_read", dyn.int),

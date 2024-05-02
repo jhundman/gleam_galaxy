@@ -1,13 +1,13 @@
-import app/cron/hex
-import app/cron/tinybird
 import app/error.{type Error}
-import app/state.{type State}
+import app/job/job_models
+import app/models.{type State}
 import birl.{type Time}
 import birl/duration
 import gleam/dict
 import gleam/dynamic
 import gleam/hackney
 import gleam/hexpm.{type Package}
+import gleam/http
 import gleam/http/request
 import gleam/int
 import gleam/io
@@ -20,17 +20,11 @@ import pprint as pp
 import shakespeare/actors/periodic.{Ms, start}
 import wisp
 
-pub fn try(a: Result(a, e), f: fn(a) -> Result(b, e)) -> Result(b, e) {
-  case a {
-    Ok(a) -> f(a)
-    Error(e) -> Error(e)
-  }
-}
-
-pub fn start_cron(hex_key: String, tinybird_key: String) {
+/// Start Cron Job to Sync Hex Packages
+pub fn start_job(hex_key: String, tinybird_key: String) {
   wisp.log_info("Start Scheduler")
 
-  let latest_ts = tinybird.get_max_package_updated_at(tinybird_key)
+  let latest_ts = get_max_package_updated_at(tinybird_key)
 
   let latest_ts = case latest_ts {
     Ok(t) -> t
@@ -43,7 +37,7 @@ pub fn start_cron(hex_key: String, tinybird_key: String) {
   pp.debug(latest_ts)
 
   let s =
-    state.State(
+    models.State(
       page: 1,
       newest: latest_ts,
       hex_key: hex_key,
@@ -51,11 +45,12 @@ pub fn start_cron(hex_key: String, tinybird_key: String) {
       updated_at: birl.utc_now(),
     )
 
-  let cron = fn() { do_cron(s) }
+  let cron = fn() { job(s) }
   start(do: cron, every: Ms(10_000))
 }
 
-fn do_cron(state: State) -> Nil {
+/// Job that Syncs Hex Package Data
+fn job(state: State) -> Nil {
   let utc = {
     birl.utc_now()
     |> birl.to_iso8601
@@ -68,11 +63,39 @@ fn do_cron(state: State) -> Nil {
   // //let download_data = create_download_json(wisp)
   // let wisp_data = create_package_json(wisp)
   // tinybird.insert_data_tb(wisp_data, state.tinybird_key, "packages")
-  let x = tinybird.get_gleam_packages(state.tinybird_key)
+  let x = get_gleam_packages(state.tinybird_key)
   io.println("RESPONSE")
   pp.debug(x)
 
   Nil
+}
+
+/// Returns max time from packages table minus 8 hours in case a job failed
+pub fn get_max_package_updated_at(tinybird_key: String) {
+  use response <- result.try(
+    request.new()
+    |> request.set_host("api.us-east.tinybird.co")
+    |> request.set_path("/v0/pipes/max_updated_at.json")
+    |> request.prepend_header("Authorization", "Bearer " <> tinybird_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+
+  use max_update <- result.try(
+    json.decode(response.body, using: job_models.decode_max_package_updated_at)
+    |> result.map_error(error.JsonDecodeError),
+  )
+
+  let max_time = case list.first(max_update.data) {
+    Ok(t) -> birl.parse(t.max_updated_at)
+    Error(_) -> Ok(birl.utc_now())
+  }
+
+  max_time
+  |> result.unwrap(birl.utc_now())
+  |> birl.subtract(duration.hours(8))
+  |> io.debug()
+  |> Ok()
 }
 
 fn first_timestamp(packages: List(hexpm.Package), state: State) -> Time {
@@ -87,11 +110,7 @@ fn first_timestamp(packages: List(hexpm.Package), state: State) -> Time {
   }
 }
 
-// fn sync_packages(state: State) {
-//   todo
-// }
-
-fn bulk_fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
+fn fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
   use response <- result.try(
     request.new()
     |> request.set_host("hex.pm")
@@ -111,35 +130,22 @@ fn bulk_fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
   Ok(all_packages)
 }
 
-fn fetch_release(release: hexpm.PackageRelease, hex_key: String) {
-  let assert Ok(url) = uri.parse(release.url)
+// fn fetch_release(release: hexpm.PackageRelease, hex_key: String) {
+//   let assert Ok(url) = uri.parse(release.url)
 
-  use response <- try(
-    request.new()
-    |> request.set_host("hex.pm")
-    |> request.set_path(url.path)
-    |> request.prepend_header("authorization", hex_key)
-    |> hackney.send
-    |> result.map_error(error.HttpClientError),
-  )
-
-  json.decode(response.body, using: hexpm.decode_release)
-  |> result.map_error(error.JsonDecodeError)
-  |> io.debug()
-}
-
-fn sync_downloads() {
-  todo
-}
-
-// fetch_package("wisp", state.hex_key)
-// let release =
-//   hexpm.PackageRelease(
-//     inserted_at: birl.utc_now(),
-//     url: "https://hex.pm/api/packages/wisp/releases/0.13.0",
-//     version: "0.13.0",
+//   use response <- try(
+//     request.new()
+//     |> request.set_host("hex.pm")
+//     |> request.set_path(url.path)
+//     |> request.prepend_header("authorization", hex_key)
+//     |> hackney.send
+//     |> result.map_error(error.HttpClientError),
 //   )
-// fetch_release(release, state.hex_key)
+
+//   json.decode(response.body, using: hexpm.decode_release)
+//   |> result.map_error(error.JsonDecodeError)
+//   |> io.debug()
+// }
 
 pub fn create_download_json(pkg: Package) {
   let downloads =
@@ -234,34 +240,6 @@ pub fn fetch_package(package_name: String, hex_key: String) {
   Ok(package)
 }
 
-/// Returns max time from packages table minus 8 hours in case a job failed
-pub fn get_max_package_updated_at(tinybird_key: String) {
-  use response <- result.try(
-    request.new()
-    |> request.set_host("api.us-east.tinybird.co")
-    |> request.set_path("/v0/pipes/max_updated_at.json")
-    |> request.prepend_header("Authorization", "Bearer " <> tinybird_key)
-    |> hackney.send
-    |> result.map_error(error.HttpClientError),
-  )
-
-  use max_update <- result.try(
-    json.decode(response.body, using: decode_max_package_updated_at)
-    |> result.map_error(error.JsonDecodeError),
-  )
-
-  let max_time = case list.first(max_update.data) {
-    Ok(t) -> birl.parse(t.max_updated_at)
-    Error(_) -> Ok(birl.utc_now())
-  }
-
-  max_time
-  |> result.unwrap(birl.utc_now())
-  |> birl.subtract(duration.hours(8))
-  |> io.debug()
-  |> Ok()
-}
-
 pub fn get_gleam_packages(tinybird_key: String) {
   use response <- result.try(
     request.new()
@@ -273,7 +251,7 @@ pub fn get_gleam_packages(tinybird_key: String) {
   )
 
   use package_list <- result.try(
-    json.decode(response.body, using: decode_gleam_packages)
+    json.decode(response.body, using: job_models.decode_gleam_packages)
     |> result.map_error(error.JsonDecodeError),
   )
 

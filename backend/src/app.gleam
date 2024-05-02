@@ -1,4 +1,4 @@
-import app/cron/sync.{start_cron}
+import app/job/job
 import app/router
 import dot_env
 import gleam/erlang/process
@@ -29,7 +29,7 @@ pub fn main() {
     |> mist.start_http
 
   // Start Cron
-  let assert Ok(_) = start_cron(hex_key, tinybird_key)
+  let assert Ok(_) = job.start_job(hex_key, tinybird_key)
 
   process.sleep_forever()
   Ok(Nil)
