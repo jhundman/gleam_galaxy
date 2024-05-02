@@ -1,6 +1,6 @@
+import app/cron/sync.{start_cron}
+import app/router
 import dot_env
-import galaxy/cron/sync.{start_cron}
-import galaxy/router
 import gleam/erlang/process
 import gleam/io
 import gleam/result.{try}

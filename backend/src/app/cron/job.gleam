@@ -1,9 +1,9 @@
+import app/cron/hex
+import app/cron/tinybird
+import app/error.{type Error}
+import app/state.{type State}
 import birl.{type Time}
 import birl/duration
-import galaxy/cron/hex
-import galaxy/cron/tinybird
-import galaxy/error.{type Error}
-import galaxy/state.{type State}
 import gleam/dict
 import gleam/dynamic
 import gleam/hackney
@@ -111,35 +111,35 @@ fn bulk_fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
   Ok(all_packages)
 }
 
-// fn fetch_release(release: hexpm.PackageRelease, hex_key: String) {
-//   let assert Ok(url) = uri.parse(release.url)
+fn fetch_release(release: hexpm.PackageRelease, hex_key: String) {
+  let assert Ok(url) = uri.parse(release.url)
 
-//   use response <- try(
-//     request.new()
-//     |> request.set_host("hex.pm")
-//     |> request.set_path(url.path)
-//     |> request.prepend_header("authorization", hex_key)
-//     |> hackney.send
-//     |> result.map_error(error.HttpClientError),
+  use response <- try(
+    request.new()
+    |> request.set_host("hex.pm")
+    |> request.set_path(url.path)
+    |> request.prepend_header("authorization", hex_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+
+  json.decode(response.body, using: hexpm.decode_release)
+  |> result.map_error(error.JsonDecodeError)
+  |> io.debug()
+}
+
+fn sync_downloads() {
+  todo
+}
+
+// fetch_package("wisp", state.hex_key)
+// let release =
+//   hexpm.PackageRelease(
+//     inserted_at: birl.utc_now(),
+//     url: "https://hex.pm/api/packages/wisp/releases/0.13.0",
+//     version: "0.13.0",
 //   )
-
-//   json.decode(response.body, using: hexpm.decode_release)
-//   |> result.map_error(error.JsonDecodeError)
-//   |> io.debug()
-// }
-
-// fn sync_downloads() {
-//   todo
-// }
-
-// // fetch_package("wisp", state.hex_key)
-// // let release =
-// //   hexpm.PackageRelease(
-// //     inserted_at: birl.utc_now(),
-// //     url: "https://hex.pm/api/packages/wisp/releases/0.13.0",
-// //     version: "0.13.0",
-// //   )
-// // fetch_release(release, state.hex_key)
+// fetch_release(release, state.hex_key)
 
 pub fn create_download_json(pkg: Package) {
   let downloads =
@@ -214,4 +214,88 @@ pub fn create_package_json(pkg: Package) {
   }
   json.to_string(x)
   |> io.debug()
+}
+
+pub fn fetch_package(package_name: String, hex_key: String) {
+  use response <- result.try(
+    request.new()
+    |> request.set_host("hex.pm")
+    |> request.set_path("/api/packages/" <> package_name)
+    |> request.prepend_header("authorization", hex_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+
+  use package <- result.try(
+    json.decode(response.body, using: hexpm.decode_package)
+    |> result.map_error(error.JsonDecodeError),
+  )
+
+  Ok(package)
+}
+
+/// Returns max time from packages table minus 8 hours in case a job failed
+pub fn get_max_package_updated_at(tinybird_key: String) {
+  use response <- result.try(
+    request.new()
+    |> request.set_host("api.us-east.tinybird.co")
+    |> request.set_path("/v0/pipes/max_updated_at.json")
+    |> request.prepend_header("Authorization", "Bearer " <> tinybird_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+
+  use max_update <- result.try(
+    json.decode(response.body, using: decode_max_package_updated_at)
+    |> result.map_error(error.JsonDecodeError),
+  )
+
+  let max_time = case list.first(max_update.data) {
+    Ok(t) -> birl.parse(t.max_updated_at)
+    Error(_) -> Ok(birl.utc_now())
+  }
+
+  max_time
+  |> result.unwrap(birl.utc_now())
+  |> birl.subtract(duration.hours(8))
+  |> io.debug()
+  |> Ok()
+}
+
+pub fn get_gleam_packages(tinybird_key: String) {
+  use response <- result.try(
+    request.new()
+    |> request.set_host("api.us-east.tinybird.co")
+    |> request.set_path("/v0/pipes/list_of_packages.json")
+    |> request.prepend_header("Authorization", "Bearer " <> tinybird_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+
+  use package_list <- result.try(
+    json.decode(response.body, using: decode_gleam_packages)
+    |> result.map_error(error.JsonDecodeError),
+  )
+
+  package_list.data
+  |> list.map(fn(x) { x.package })
+  |> Ok()
+}
+
+// Insert Package
+
+pub fn insert_data_tb(body: String, tinybird_key: String, table_name: String) {
+  use response <- result.try(
+    request.new()
+    |> request.set_method(http.Post)
+    |> request.set_host("api.us-east.tinybird.co")
+    |> request.set_path("/v0/events")
+    |> request.prepend_header("Authorization", "Bearer " <> tinybird_key)
+    |> request.set_query([#("name", table_name)])
+    |> request.set_body(body)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+  io.debug(response)
+  Ok(Nil)
 }
