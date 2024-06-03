@@ -9,3 +9,5 @@
 	<div class="row-start-2 flex justify-center border-2">2</div>
 	<div class="row-start-2 flex justify-center border-2">3</div>
 </div>
+
+<div class="p-10"><a href="/wisp">wisp</a></div>
