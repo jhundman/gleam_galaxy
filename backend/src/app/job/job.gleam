@@ -14,19 +14,18 @@ import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option
-import gleam/order
+import gleam/order.{Eq, Gt, Lt}
 import gleam/result
+import gleam/uri
 import pprint as pp
 import shakespeare/actors/periodic.{Ms, start}
 import wisp
 
 /// Start Cron Job to Sync Hex Packages
-pub fn start_job(hex_key: String, tinybird_key: String) {
+pub fn start_sync(hex_key: String, tinybird_key: String) {
   wisp.log_info("Start Scheduler")
 
-  let latest_ts = get_max_package_updated_at(tinybird_key)
-
-  let latest_ts = case latest_ts {
+  let last_updated_at = case get_max_package_updated_at(tinybird_key) {
     Ok(t) -> t
     Error(_) ->
       birl.utc_now()
@@ -34,43 +33,37 @@ pub fn start_job(hex_key: String, tinybird_key: String) {
   }
 
   io.println("\nLatest TS")
-  pp.debug(latest_ts)
+  pp.debug(last_updated_at)
 
-  let s =
+  let state =
     models.State(
       page: 1,
-      newest: latest_ts,
+      last_updated_at: last_updated_at,
       hex_key: hex_key,
       tinybird_key: tinybird_key,
-      updated_at: birl.utc_now(),
+      current_time: birl.utc_now(),
     )
 
-  let cron = fn() { job(s) }
-  start(do: cron, every: Ms(10_000))
+  // Periodic actor takes a function, and sync needs state. Run every ...
+  let cron = fn() { sync_data(state) }
+  start(do: cron, every: Ms(5000))
 }
 
 /// Job that Syncs Hex Package Data
-fn job(state: State) -> Nil {
-  let utc = {
-    birl.utc_now()
-    |> birl.to_iso8601
-  }
-  wisp.log_info("Start Cron Job at: " <> utc)
+fn sync_data(state: State) -> Nil {
+  wisp.log_info("Start Cron Job at: " <> state.current_time |> birl.to_iso8601)
+
+  // io.println("\nState")
   // pp.debug(state)
 
-  // let assert Ok(wisp) = hex.fetch_package("mist", state.hex_key)
-  // // get_most_recent_version(wisp)
-  // //let download_data = create_download_json(wisp)
-  // let wisp_data = create_package_json(wisp)
-  // tinybird.insert_data_tb(wisp_data, state.tinybird_key, "packages")
-  let x = get_gleam_packages(state.tinybird_key)
-  io.println("RESPONSE")
-  pp.debug(x)
+  // Sync Updates
+  pp.debug(sync_updates(state))
+  // Sync Downloads
 
   Nil
 }
 
-/// Returns max time from packages table minus 8 hours in case a job failed
+/// Get Max Package Updated At Returns max time from packages table minus 8 hours in case a job failed
 pub fn get_max_package_updated_at(tinybird_key: String) {
   use response <- result.try(
     request.new()
@@ -98,16 +91,44 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
   |> Ok()
 }
 
-fn first_timestamp(packages: List(hexpm.Package), state: State) -> Time {
-  case packages {
-    [] -> state.newest
-    [package, ..] -> {
-      case birl.compare(package.updated_at, state.newest) {
-        order.Gt -> package.updated_at
-        _ -> state.newest
-      }
-    }
+/// Sync Package Updates
+fn sync_updates(state: State) {
+  use packages <- result.try(fetch_packages(state))
+  use min_date <- result.try(min_timestamp(packages))
+  //pp.debug(packages)
+  io.println("TESTING --------")
+  case birl.compare(min_date, state.last_updated_at) {
+    Gt | Eq ->
+      io.println(
+        "Gt Eq"
+        <> birl.to_iso8601(min_date)
+        <> birl.to_iso8601(state.last_updated_at),
+      )
+    Lt -> io.println("Lt")
   }
+
+  Ok(Nil)
+}
+
+// /// Sync Package Updates
+// fn sync_downloads(state: State) {
+//   todo
+// }
+
+fn min_timestamp(packages: List(hexpm.Package)) -> Result(Time, Error) {
+  // Assume the packages are sorted desc
+  let assert Ok(first) = list.first(packages)
+  let assert Ok(last) = list.last(packages)
+  case birl.compare(first.updated_at, last.updated_at) {
+    Gt | Eq -> Nil
+    Lt -> panic as "PACKAGES NOT SORTED CORRECTLY"
+  }
+
+  case list.last(packages) {
+    Ok(last) -> last.updated_at
+    Error(_) -> birl.from_unix(0)
+  }
+  |> Ok()
 }
 
 fn fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
@@ -130,22 +151,53 @@ fn fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
   Ok(all_packages)
 }
 
-// fn fetch_release(release: hexpm.PackageRelease, hex_key: String) {
-//   let assert Ok(url) = uri.parse(release.url)
+fn process_package(package: hexpm.Package, state: State) {
+  use releases <- result.try(lookup_gleam_releases(package, state.hex_key))
+  case releases {
+    [] -> Ok(state)
+    _ -> {
+      insert_package(package, releases)
+      Ok(state)
+    }
+  }
+}
 
-//   use response <- try(
-//     request.new()
-//     |> request.set_host("hex.pm")
-//     |> request.set_path(url.path)
-//     |> request.prepend_header("authorization", hex_key)
-//     |> hackney.send
-//     |> result.map_error(error.HttpClientError),
-//   )
+fn insert_package(package: hexpm.Package, releases: List(hexpm.Release)) {
+  todo
+}
 
-//   json.decode(response.body, using: hexpm.decode_release)
-//   |> result.map_error(error.JsonDecodeError)
-//   |> io.debug()
-// }
+fn lookup_gleam_releases(
+  package: hexpm.Package,
+  hex_key: String,
+) -> Result(List(hexpm.Release), Error) {
+  use releases <- result.try(
+    list.try_map(package.releases, lookup_release(_, hex_key)),
+  )
+  releases
+  |> list.filter(fn(release) {
+    list.contains(release.meta.build_tools, "gleam")
+  })
+  |> Ok
+}
+
+fn lookup_release(
+  release: hexpm.PackageRelease,
+  hex_key: String,
+) -> Result(hexpm.Release, Error) {
+  let assert Ok(url) = uri.parse(release.url)
+
+  use response <- result.try(
+    request.new()
+    |> request.set_host("hex.pm")
+    |> request.set_path(url.path)
+    |> request.prepend_header("authorization", hex_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+
+  json.decode(response.body, using: hexpm.decode_release)
+  |> result.map_error(error.JsonDecodeError)
+}
 
 pub fn create_download_json(pkg: Package) {
   let downloads =

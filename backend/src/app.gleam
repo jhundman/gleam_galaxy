@@ -2,7 +2,6 @@ import app/job/job
 import app/router
 import dot_env
 import gleam/erlang/process
-import gleam/io
 import gleam/result.{try}
 import glenvy/dotenv
 import glenvy/env
@@ -29,7 +28,7 @@ pub fn main() {
     |> mist.start_http
 
   // Start Cron
-  let assert Ok(_) = job.start_job(hex_key, tinybird_key)
+  let assert Ok(_) = job.start_sync(hex_key, tinybird_key)
 
   process.sleep_forever()
   Ok(Nil)
