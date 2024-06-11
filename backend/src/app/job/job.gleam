@@ -5,6 +5,7 @@ import birl.{type Time}
 import birl/duration
 import gleam/dict
 import gleam/dynamic
+import gleam/erlang/process
 import gleam/hackney
 import gleam/hexpm.{type Package}
 import gleam/http
@@ -97,6 +98,12 @@ fn sync_updates(state: State) {
   use min_date <- result.try(min_timestamp(packages))
   //pp.debug(packages)
   io.println("TESTING --------")
+  list.each(packages, fn(a) {
+    process.sleep(1000)
+    io.debug(a.name)
+    process_package(a, state)
+  })
+
   case birl.compare(min_date, state.last_updated_at) {
     Gt | Eq ->
       io.println(
@@ -154,16 +161,27 @@ fn fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
 fn process_package(package: hexpm.Package, state: State) {
   use releases <- result.try(lookup_gleam_releases(package, state.hex_key))
   case releases {
-    [] -> Ok(state)
+    [] -> {
+      io.print("NO GLEAM RELEASES")
+      Ok(state)
+    }
     _ -> {
-      insert_package(package, releases)
+      pp.debug(package.name)
+      pp.debug(list.first(releases))
+      insert_updates(package, releases, state)
       Ok(state)
     }
   }
 }
 
-fn insert_package(package: hexpm.Package, releases: List(hexpm.Release)) {
-  todo
+fn insert_updates(
+  package: hexpm.Package,
+  releases: List(hexpm.Release),
+  state: State,
+) {
+  io.println("CREATE JSON")
+  create_package_json(package)
+  |> insert_data_tb(state.tinybird_key, "packages")
 }
 
 fn lookup_gleam_releases(
@@ -225,7 +243,6 @@ pub fn create_download_json(pkg: Package) {
     ])
   }
   json.to_string(x)
-  |> io.debug()
 }
 
 pub fn create_package_json(pkg: Package) {
@@ -271,7 +288,6 @@ pub fn create_package_json(pkg: Package) {
     ])
   }
   json.to_string(x)
-  |> io.debug()
 }
 
 pub fn fetch_package(package_name: String, hex_key: String) {
