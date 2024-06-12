@@ -99,7 +99,7 @@ fn sync_updates(state: State) {
   //pp.debug(packages)
   io.println("TESTING --------")
   list.each(packages, fn(a) {
-    process.sleep(1000)
+    process.sleep(50)
     io.debug(a.name)
     process_package(a, state)
   })
