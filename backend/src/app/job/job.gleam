@@ -92,35 +92,42 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
   |> Ok()
 }
 
-/// Sync Package Updates
+/// Sync Package Updates (Loop)
 fn sync_updates(state: State) {
   use packages <- result.try(fetch_packages(state))
   use min_date <- result.try(min_timestamp(packages))
-  //pp.debug(packages)
-  io.println("TESTING --------")
-  list.each(packages, fn(a) {
-    process.sleep(50)
-    io.debug(a.name)
-    process_package(a, state)
-  })
 
+  // list.each(packages, fn(a) {
+  //   process.sleep(50)
+  //   io.debug(a.name)
+  //   process_package(a, state)
+  // })
+
+  // If min package updated at greater than or equal to max tb date
+  // then keep looping as have not seen all packages
   case birl.compare(min_date, state.last_updated_at) {
     Gt | Eq ->
       io.println(
         "Gt Eq"
+        <> " Packages Date"
         <> birl.to_iso8601(min_date)
+        <> " Min Date TB: "
         <> birl.to_iso8601(state.last_updated_at),
       )
-    Lt -> io.println("Lt")
+    Lt -> {
+      io.println("Lt")
+      io.println(
+        "LT"
+        <> " Packages Date"
+        <> birl.to_iso8601(min_date)
+        <> " Min Date TB: "
+        <> birl.to_iso8601(state.last_updated_at),
+      )
+    }
   }
 
   Ok(Nil)
 }
-
-// /// Sync Package Updates
-// fn sync_downloads(state: State) {
-//   todo
-// }
 
 fn min_timestamp(packages: List(hexpm.Package)) -> Result(Time, Error) {
   // Assume the packages are sorted desc
@@ -294,6 +301,7 @@ pub fn create_package_json(pkg: Package) {
   json.to_string(x)
 }
 
+// Map over all releases, and create a ndjson string to be inserted which contains all releases
 fn create_release_json(package_name: String, releases: List(hexpm.Release)) {
   list.fold(releases, "", fn(b, a) {
     b <> "\n" <> release_to_json(package_name, a)
