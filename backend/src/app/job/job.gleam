@@ -182,6 +182,10 @@ fn insert_updates(
   io.println("CREATE JSON")
   create_package_json(package)
   |> insert_data_tb(state.tinybird_key, "packages")
+
+  io.println("CREATE RELEASES")
+  create_release_json(package.name, releases)
+  |> insert_data_tb(state.tinybird_key, "package_releases")
 }
 
 fn lookup_gleam_releases(
@@ -282,6 +286,42 @@ pub fn create_package_json(pkg: Package) {
       #("repository_url", repo_url),
       #("owners", json.array([], of: json.string)),
       #("downloads_all_time", downloads),
+      #("hex_updated_at", hex_updated_at),
+      #("hex_inserted_at", hex_inserted_at),
+      #("inserted_at", inserted_at),
+    ])
+  }
+  json.to_string(x)
+}
+
+fn create_release_json(package_name: String, releases: List(hexpm.Release)) {
+  list.fold(releases, "", fn(b, a) {
+    b <> "\n" <> release_to_json(package_name, a)
+  })
+}
+
+fn release_to_json(package_name: String, release: hexpm.Release) {
+  let hex_updated_at =
+    release.updated_at
+    |> birl.to_iso8601()
+    |> json.string()
+
+  let hex_inserted_at =
+    release.inserted_at
+    |> birl.to_iso8601()
+    |> json.string()
+
+  let inserted_at =
+    birl.utc_now()
+    |> birl.to_iso8601()
+    |> json.string()
+
+  let x = {
+    json.object([
+      #("package_name", json.string(package_name)),
+      #("release", json.string(release.version)),
+      #("release_downloads", json.int(release.downloads)),
+      #("url", json.string(release.url)),
       #("hex_updated_at", hex_updated_at),
       #("hex_inserted_at", hex_inserted_at),
       #("inserted_at", inserted_at),
