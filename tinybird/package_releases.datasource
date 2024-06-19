@@ -3,9 +3,10 @@ SCHEMA >
     `release` String `json:$.release`,
     `release_downloads` UInt64 `json:$.release_downloads`,
     `url` String `json:$.url`,
-    `released_at` String `json:$.released_at`,
+    `hex_updated_at` String `json:$.hex_updated_at`,
+    `hex_inserted_at` String `json:$.hex_inserted_at`,
     `inserted_at` String `json:$.inserted_at`
 
 ENGINE ReplacingMergeTree
 ENGINE_SORTING_KEY package_name, release
-ENGINE_VER released_at
+ENGINE_VER inserted_at
