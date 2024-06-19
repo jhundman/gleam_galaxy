@@ -17,6 +17,7 @@ import gleam/list
 import gleam/option
 import gleam/order.{Eq, Gt, Lt}
 import gleam/result
+import gleam/string
 import gleam/uri
 import pprint as pp
 import shakespeare/actors/periodic.{Ms, start}
@@ -58,8 +59,9 @@ fn sync_data(state: State) -> Nil {
   // pp.debug(state)
 
   // Sync Updates
-  pp.debug(sync_updates(state))
+  // pp.debug(sync_updates(state))
   // Sync Downloads
+  pp.debug(sync_downloads(state))
 
   Nil
 }
@@ -356,7 +358,7 @@ pub fn fetch_package(package_name: String, hex_key: String) {
   Ok(package)
 }
 
-pub fn get_gleam_packages(tinybird_key: String) {
+fn get_gleam_packages(tinybird_key: String) {
   use response <- result.try(
     request.new()
     |> request.set_host("api.us-east.tinybird.co")
@@ -378,7 +380,7 @@ pub fn get_gleam_packages(tinybird_key: String) {
 
 // Insert Package
 
-pub fn insert_data_tb(body: String, tinybird_key: String, table_name: String) {
+fn insert_data_tb(body: String, tinybird_key: String, table_name: String) {
   use response <- result.try(
     request.new()
     |> request.set_method(http.Post)
@@ -392,4 +394,30 @@ pub fn insert_data_tb(body: String, tinybird_key: String, table_name: String) {
   )
   io.debug(response)
   Ok(Nil)
+}
+
+// Sync Downloads
+
+fn sync_downloads(state: State) {
+  io.println("start sync downloads")
+  get_list_gleam_packages(state)
+}
+
+fn get_list_gleam_packages(state: State) {
+  use response <- result.try(
+    request.new()
+    |> request.set_host("api.us-east.tinybird.co")
+    |> request.set_path("/v0/pipes/list_of_packages.csv")
+    |> request.prepend_header("Authorization", "Bearer " <> state.tinybird_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+
+  let packages =
+    response.body
+    |> string.split("\n")
+    |> list.map(fn(x) { string.replace(in: x, each: "\"", with: "") })
+    |> list.filter(fn(x) { string.length(x) > 0 })
+
+  Ok(packages)
 }
