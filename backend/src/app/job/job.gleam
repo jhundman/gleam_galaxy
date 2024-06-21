@@ -19,7 +19,8 @@ import gleam/order.{Eq, Gt, Lt}
 import gleam/result
 import gleam/string
 import gleam/uri
-import pprint as pp
+
+// import pprint as pp
 import shakespeare/actors/periodic.{Ms, start}
 import wisp
 
@@ -53,17 +54,19 @@ fn sync_data(state: State) -> Nil {
   }
 
   let state = models.State(..state, last_updated_at: last_updated_at)
-  pp.debug(state)
   wisp.log_info("Start Cron Job at: " <> state.current_time |> birl.to_iso8601)
 
-  // io.println("\nState")
-  // pp.debug(state)
-
   // Sync Updates
-  // sync_updates(state)
-  // Sync Downloads
-  pp.debug(sync_downloads(state))
+  wisp.log_info("===== Sync Updates =====")
+  let _ = sync_updates(state)
 
+  // Sync Downloads
+  wisp.log_info("===== Sync Downloads =====")
+  let _ = sync_downloads(state)
+
+  wisp.log_info(
+    "Cron Job Completed at: " <> state.current_time |> birl.to_iso8601,
+  )
   Nil
 }
 
@@ -77,12 +80,10 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
     |> hackney.send
     |> result.map_error(error.HttpClientError),
   )
-  pp.debug(response)
   use max_update <- result.try(
     json.decode(response.body, using: job_models.decode_max_package_updated_at)
     |> result.map_error(error.JsonDecodeError),
   )
-  pp.debug(max_update)
 
   let max_time = case list.first(max_update.data) {
     Ok(t) -> birl.parse(t.max_updated_at)
@@ -92,25 +93,23 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
   max_time
   |> result.unwrap(birl.utc_now())
   |> birl.subtract(duration.hours(8))
-  |> io.debug()
   |> Ok()
 }
 
-/// Sync Package Updates (Loop)
+/// Sync Package Updates ==========================================================================
 fn sync_updates(state: State) {
   use packages <- result.try(fetch_packages(state))
   use min_date <- result.try(min_timestamp(packages))
 
   list.each(packages, fn(a) {
-    process.sleep(50)
-    io.debug(a.name)
+    process.sleep(25)
     process_package(a, state)
   })
 
   // If min package updated at greater than or equal to max tb date
   // then keep looping as have not seen all packages
-  case birl.compare(min_date, state.last_updated_at) {
-    Gt | Eq ->
+  let _ = case birl.compare(min_date, state.last_updated_at) {
+    Gt | Eq -> {
       io.println(
         "Gt Eq"
         <> " Packages Date"
@@ -118,8 +117,9 @@ fn sync_updates(state: State) {
         <> " Min Date TB: "
         <> birl.to_iso8601(state.last_updated_at),
       )
+      sync_updates(models.State(..state, page: state.page + 1))
+    }
     Lt -> {
-      io.println("Lt")
       io.println(
         "LT"
         <> " Packages Date"
@@ -127,6 +127,7 @@ fn sync_updates(state: State) {
         <> " Min Date TB: "
         <> birl.to_iso8601(state.last_updated_at),
       )
+      Ok(Nil)
     }
   }
 
@@ -173,13 +174,12 @@ fn process_package(package: hexpm.Package, state: State) {
   use releases <- result.try(lookup_gleam_releases(package, state.hex_key))
   case releases {
     [] -> {
-      io.print("NO GLEAM RELEASES")
+      io.println(package.name <> " - NO GLEAM RELEASES")
       Ok(state)
     }
     _ -> {
-      pp.debug(package.name)
-      pp.debug(list.first(releases))
-      insert_updates(package, releases, state)
+      io.println("UPDATE - " <> package.name)
+      let _ = insert_updates(package, releases, state)
       Ok(state)
     }
   }
@@ -191,8 +191,9 @@ fn insert_updates(
   state: State,
 ) {
   io.println("CREATE JSON")
-  create_package_json(package)
-  |> insert_data_tb(state.tinybird_key, "packages")
+  let _ =
+    create_package_json(package)
+    |> insert_data_tb(state.tinybird_key, "packages")
 
   io.println("CREATE RELEASES")
   create_release_json(package.name, releases)
@@ -360,30 +361,10 @@ pub fn fetch_package(package_name: String, hex_key: String) {
   Ok(package)
 }
 
-fn get_gleam_packages(tinybird_key: String) {
-  use response <- result.try(
-    request.new()
-    |> request.set_host("api.us-east.tinybird.co")
-    |> request.set_path("/v0/pipes/list_of_packages.json")
-    |> request.prepend_header("Authorization", "Bearer " <> tinybird_key)
-    |> hackney.send
-    |> result.map_error(error.HttpClientError),
-  )
-
-  use package_list <- result.try(
-    json.decode(response.body, using: job_models.decode_gleam_packages)
-    |> result.map_error(error.JsonDecodeError),
-  )
-
-  package_list.data
-  |> list.map(fn(x) { x.package })
-  |> Ok()
-}
-
 // Insert Package
 
 fn insert_data_tb(body: String, tinybird_key: String, table_name: String) {
-  use response <- result.try(
+  let _ =
     request.new()
     |> request.set_method(http.Post)
     |> request.set_host("api.us-east.tinybird.co")
@@ -392,16 +373,13 @@ fn insert_data_tb(body: String, tinybird_key: String, table_name: String) {
     |> request.set_query([#("name", table_name)])
     |> request.set_body(body)
     |> hackney.send
-    |> result.map_error(error.HttpClientError),
-  )
-  io.debug(response)
+    |> result.map_error(error.HttpClientError)
   Ok(Nil)
 }
 
-// Sync Downloads
+// Sync Downloads =======================================================================
 
 fn sync_downloads(state: State) {
-  io.println("==== start sync downloads ====")
   let packages = case get_list_gleam_packages(state) {
     Ok(packages) -> {
       { int.to_string(list.length(packages)) <> "" }
