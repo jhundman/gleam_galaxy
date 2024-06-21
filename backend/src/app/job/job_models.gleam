@@ -1,4 +1,5 @@
 import app/models.{type Meta, type Statistics}
+import birl
 import gleam/dynamic.{type DecodeError, type Dynamic} as dyn
 import gleam/io
 

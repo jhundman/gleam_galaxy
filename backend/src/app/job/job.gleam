@@ -27,20 +27,12 @@ import wisp
 pub fn start_sync(hex_key: String, tinybird_key: String) {
   wisp.log_info("Start Scheduler")
 
-  let last_updated_at = case get_max_package_updated_at(tinybird_key) {
-    Ok(t) -> t
-    Error(_) ->
-      birl.utc_now()
-      |> birl.subtract(duration.years(5))
-  }
-
   io.println("\nLatest TS")
-  pp.debug(last_updated_at)
 
   let state =
     models.State(
       page: 1,
-      last_updated_at: last_updated_at,
+      last_updated_at: birl.utc_now(),
       hex_key: hex_key,
       tinybird_key: tinybird_key,
       current_time: birl.utc_now(),
@@ -53,13 +45,22 @@ pub fn start_sync(hex_key: String, tinybird_key: String) {
 
 /// Job that Syncs Hex Package Data
 fn sync_data(state: State) -> Nil {
+  let last_updated_at = case get_max_package_updated_at(state.tinybird_key) {
+    Ok(t) -> t
+    Error(_) ->
+      birl.utc_now()
+      |> birl.subtract(duration.years(5))
+  }
+
+  let state = models.State(..state, last_updated_at: last_updated_at)
+  pp.debug(state)
   wisp.log_info("Start Cron Job at: " <> state.current_time |> birl.to_iso8601)
 
   // io.println("\nState")
   // pp.debug(state)
 
   // Sync Updates
-  // pp.debug(sync_updates(state))
+  // sync_updates(state)
   // Sync Downloads
   pp.debug(sync_downloads(state))
 
@@ -76,11 +77,12 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
     |> hackney.send
     |> result.map_error(error.HttpClientError),
   )
-
+  pp.debug(response)
   use max_update <- result.try(
     json.decode(response.body, using: job_models.decode_max_package_updated_at)
     |> result.map_error(error.JsonDecodeError),
   )
+  pp.debug(max_update)
 
   let max_time = case list.first(max_update.data) {
     Ok(t) -> birl.parse(t.max_updated_at)
@@ -99,11 +101,11 @@ fn sync_updates(state: State) {
   use packages <- result.try(fetch_packages(state))
   use min_date <- result.try(min_timestamp(packages))
 
-  // list.each(packages, fn(a) {
-  //   process.sleep(50)
-  //   io.debug(a.name)
-  //   process_package(a, state)
-  // })
+  list.each(packages, fn(a) {
+    process.sleep(50)
+    io.debug(a.name)
+    process_package(a, state)
+  })
 
   // If min package updated at greater than or equal to max tb date
   // then keep looping as have not seen all packages
@@ -399,8 +401,21 @@ fn insert_data_tb(body: String, tinybird_key: String, table_name: String) {
 // Sync Downloads
 
 fn sync_downloads(state: State) {
-  io.println("start sync downloads")
-  get_list_gleam_packages(state)
+  io.println("==== start sync downloads ====")
+  let packages = case get_list_gleam_packages(state) {
+    Ok(packages) -> {
+      { int.to_string(list.length(packages)) <> "" }
+      |> io.println()
+      packages
+    }
+    Error(_) -> []
+  }
+
+  packages
+  |> list.map(fn(a) { fetch_package(a, state.hex_key) })
+  |> list.fold("", fn(b, a) { b <> create_package_downloads(a) })
+  |> insert_data_tb(state.tinybird_key, "package_daily_downloads")
+  |> io.debug()
 }
 
 fn get_list_gleam_packages(state: State) {
@@ -420,4 +435,36 @@ fn get_list_gleam_packages(state: State) {
     |> list.filter(fn(x) { string.length(x) > 0 })
 
   Ok(packages)
+}
+
+fn create_package_downloads(package: Result(hexpm.Package, Error)) {
+  case package {
+    Ok(package) -> {
+      let downloads =
+        package.downloads
+        |> dict.get("day")
+        |> result.unwrap(0)
+
+      let date =
+        birl.utc_now()
+        |> birl.to_naive_date_string()
+        |> json.string()
+
+      let inserted_at =
+        birl.utc_now()
+        |> birl.to_iso8601()
+        |> json.string()
+
+      let x = {
+        json.object([
+          #("package_name", json.string(package.name)),
+          #("date", date),
+          #("downloads_yesterday", json.int(downloads)),
+          #("inserted_at", inserted_at),
+        ])
+      }
+      json.to_string(x) <> "\n"
+    }
+    Error(_) -> ""
+  }
 }
