@@ -16,6 +16,7 @@ import gleam/json
 import gleam/list
 import gleam/option
 import gleam/order.{Eq, Gt, Lt}
+import gleam/otp/task
 import gleam/result
 import gleam/string
 import gleam/uri
@@ -41,7 +42,7 @@ pub fn start_sync(hex_key: String, tinybird_key: String) {
 
   // Periodic actor takes a function, and sync needs state. Run every ...
   let cron = fn() { sync_data(state) }
-  start(do: cron, every: Ms(5000))
+  start(do: cron, every: Ms(10_000))
 }
 
 /// Job that Syncs Hex Package Data
@@ -62,7 +63,7 @@ fn sync_data(state: State) -> Nil {
 
   // Sync Downloads
   wisp.log_info("===== Sync Downloads =====")
-  let _ = sync_downloads(state)
+  // let _ = sync_downloads(state)
 
   wisp.log_info(
     "Cron Job Completed at: " <> state.current_time |> birl.to_iso8601,
@@ -100,36 +101,61 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
 fn sync_updates(state: State) {
   use packages <- result.try(fetch_packages(state))
   use min_date <- result.try(min_timestamp(packages))
+  let start = birl.utc_now()
 
-  list.each(packages, fn(a) {
-    process.sleep(25)
-    process_package(a, state)
-  })
+  // 100 / chunk size = num_tasks
+  let chunks = list.sized_chunk(packages, 10)
 
-  // If min package updated at greater than or equal to max tb date
-  // then keep looping as have not seen all packages
-  let _ = case birl.compare(min_date, state.last_updated_at) {
-    Gt | Eq -> {
-      io.println(
-        "Gt Eq"
-        <> " Packages Date"
-        <> birl.to_iso8601(min_date)
-        <> " Min Date TB: "
-        <> birl.to_iso8601(state.last_updated_at),
-      )
-      sync_updates(models.State(..state, page: state.page + 1))
-    }
-    Lt -> {
-      io.println(
-        "LT"
-        <> " Packages Date"
-        <> birl.to_iso8601(min_date)
-        <> " Min Date TB: "
-        <> birl.to_iso8601(state.last_updated_at),
-      )
-      Ok(Nil)
-    }
-  }
+  let handles =
+    list.map(chunks, fn(chunk) {
+      task.async(fn() {
+        list.map(chunk, fn(pkg) {
+          process.sleep(100)
+          process_package(pkg, state)
+        })
+      })
+    })
+
+  let pkgs =
+    list.fold(handles, [], fn(acc, handle) {
+      let result = task.await(handle, 60_000)
+      list.concat([result, acc])
+    })
+
+  io.debug(list.length(pkgs))
+  io.println(
+    "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
+  )
+
+  // list.each(packages, fn(a) {
+  //   process.sleep(25)
+  //   process_package(a, state)
+  // })
+
+  // // If min package updated at greater than or equal to max tb date
+  // // then keep looping as have not seen all packages
+  // let _ = case birl.compare(min_date, state.last_updated_at) {
+  //   Gt | Eq -> {
+  //     io.println(
+  //       "Gt Eq"
+  //       <> " Packages Date"
+  //       <> birl.to_iso8601(min_date)
+  //       <> " Min Date TB: "
+  //       <> birl.to_iso8601(state.last_updated_at),
+  //     )
+  //     sync_updates(models.State(..state, page: state.page + 1))
+  //   }
+  //   Lt -> {
+  //     io.println(
+  //       "LT"
+  //       <> " Packages Date"
+  //       <> birl.to_iso8601(min_date)
+  //       <> " Min Date TB: "
+  //       <> birl.to_iso8601(state.last_updated_at),
+  //     )
+  //     Ok(Nil)
+  //   }
+  // }
 
   Ok(Nil)
 }
@@ -174,7 +200,7 @@ fn process_package(package: hexpm.Package, state: State) {
   use releases <- result.try(lookup_gleam_releases(package, state.hex_key))
   case releases {
     [] -> {
-      io.println(package.name <> " - NO GLEAM RELEASES")
+      // io.println(package.name <> " - NO GLEAM RELEASES")
       Ok(state)
     }
     _ -> {
@@ -190,12 +216,12 @@ fn insert_updates(
   releases: List(hexpm.Release),
   state: State,
 ) {
-  io.println("CREATE JSON")
+  // io.println("CREATE JSON")
   let _ =
     create_package_json(package)
     |> insert_data_tb(state.tinybird_key, "packages")
 
-  io.println("CREATE RELEASES")
+  // io.println("CREATE RELEASES")
   create_release_json(package.name, releases)
   |> insert_data_tb(state.tinybird_key, "package_releases")
 }
