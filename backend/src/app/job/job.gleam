@@ -40,9 +40,9 @@ pub fn start_sync(hex_key: String, tinybird_key: String) {
       current_time: birl.utc_now(),
     )
 
-  // Periodic actor takes a function, and sync needs state. Run every ...
+  // Periodic actor takes a function, and sync needs state. Run every 10hr to get 2x a day
   let cron = fn() { sync_data(state) }
-  start(do: cron, every: Ms(10_000))
+  start(do: cron, every: Ms(36_000_000))
 }
 
 /// Job that Syncs Hex Package Data
@@ -59,11 +59,11 @@ fn sync_data(state: State) -> Nil {
 
   // Sync Updates
   wisp.log_info("===== Sync Updates =====")
-  let _ = sync_updates(state)
+  // let _ = sync_updates(state)
 
   // Sync Downloads
   wisp.log_info("===== Sync Downloads =====")
-  let _ = sync_downloads(state)
+  // let _ = sync_downloads(state)
 
   wisp.log_info(
     "Cron Job Completed at: " <> state.current_time |> birl.to_iso8601,
@@ -126,6 +126,7 @@ fn sync_updates(state: State) {
   io.println(
     "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
   )
+  process.sleep(30_000)
 
   // If min package updated at greater than or equal to max tb date
   // then keep looping as have not seen all packages

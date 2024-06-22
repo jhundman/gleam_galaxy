@@ -1,19 +1,7 @@
+import app/api/web.{handle_api_request}
 import gleam/io
+import gleam/json
 import wisp.{type Request, type Response}
-
-// Wisp has functions for logging messages using the BEAM logger.
-//
-// Messages can be logged at different levels. From most important to least
-// important they are:
-// - emergency
-// - alert
-// - critical
-// - error
-// - warning
-// - notice
-// - info
-// - debug
-//
 
 pub fn middleware(
   req: wisp.Request,
@@ -21,9 +9,9 @@ pub fn middleware(
 ) -> wisp.Response {
   let req = wisp.method_override(req)
   use <- wisp.log_request(req)
-  use <- wisp.rescue_crashes
+  use <- wisp.rescue_crashes()
   use req <- wisp.handle_head(req)
-
+  use <- default_responses()
   handle_request(req)
 }
 
@@ -32,14 +20,28 @@ pub fn handle_request(req: Request) -> Response {
 
   case wisp.path_segments(req) {
     [] -> {
-      wisp.log_info("The home page")
-      io.println("Hi this is home")
-      wisp.ok()
+      json.object([#("message", json.string("Hello World"))])
+      |> json.to_string_builder
+      |> wisp.json_response(200)
     }
 
+    ["api", ..] -> handle_api_request(req)
+
     _ -> {
-      wisp.log_warning("User requested a route that does not exist")
-      wisp.not_found()
+      wisp.response(404)
     }
+  }
+}
+
+pub fn default_responses(handle_request: fn() -> wisp.Response) -> wisp.Response {
+  let response = handle_request()
+  case response.status {
+    404 | 405 -> {
+      json.object([#("message", json.string("Are you lost fellow traveler?"))])
+      |> json.to_string_builder
+      |> wisp.json_response(404)
+    }
+
+    _ -> response
   }
 }
