@@ -63,7 +63,7 @@ fn sync_data(state: State) -> Nil {
 
   // Sync Downloads
   wisp.log_info("===== Sync Downloads =====")
-  // let _ = sync_downloads(state)
+  let _ = sync_downloads(state)
 
   wisp.log_info(
     "Cron Job Completed at: " <> state.current_time |> birl.to_iso8601,
@@ -127,35 +127,30 @@ fn sync_updates(state: State) {
     "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
   )
 
-  // list.each(packages, fn(a) {
-  //   process.sleep(25)
-  //   process_package(a, state)
-  // })
-
-  // // If min package updated at greater than or equal to max tb date
-  // // then keep looping as have not seen all packages
-  // let _ = case birl.compare(min_date, state.last_updated_at) {
-  //   Gt | Eq -> {
-  //     io.println(
-  //       "Gt Eq"
-  //       <> " Packages Date"
-  //       <> birl.to_iso8601(min_date)
-  //       <> " Min Date TB: "
-  //       <> birl.to_iso8601(state.last_updated_at),
-  //     )
-  //     sync_updates(models.State(..state, page: state.page + 1))
-  //   }
-  //   Lt -> {
-  //     io.println(
-  //       "LT"
-  //       <> " Packages Date"
-  //       <> birl.to_iso8601(min_date)
-  //       <> " Min Date TB: "
-  //       <> birl.to_iso8601(state.last_updated_at),
-  //     )
-  //     Ok(Nil)
-  //   }
-  // }
+  // If min package updated at greater than or equal to max tb date
+  // then keep looping as have not seen all packages
+  let _ = case birl.compare(min_date, state.last_updated_at) {
+    Gt | Eq -> {
+      io.println(
+        "Gt Eq"
+        <> " Packages Date"
+        <> birl.to_iso8601(min_date)
+        <> " Min Date TB: "
+        <> birl.to_iso8601(state.last_updated_at),
+      )
+      sync_updates(models.State(..state, page: state.page + 1))
+    }
+    Lt -> {
+      io.println(
+        "LT"
+        <> " Packages Date"
+        <> birl.to_iso8601(min_date)
+        <> " Min Date TB: "
+        <> birl.to_iso8601(state.last_updated_at),
+      )
+      Ok(Nil)
+    }
+  }
 
   Ok(Nil)
 }
@@ -408,18 +403,40 @@ fn insert_data_tb(body: String, tinybird_key: String, table_name: String) {
 fn sync_downloads(state: State) {
   let packages = case get_list_gleam_packages(state) {
     Ok(packages) -> {
-      { int.to_string(list.length(packages)) <> "" }
+      { int.to_string(list.length(packages)) <> " Packages to Get Downloads" }
       |> io.println()
       packages
     }
     Error(_) -> []
   }
 
-  packages
-  |> list.map(fn(a) { fetch_package(a, state.hex_key) })
-  |> list.fold("", fn(b, a) { b <> create_package_downloads(a) })
-  |> insert_data_tb(state.tinybird_key, "package_daily_downloads")
-  |> io.debug()
+  let start = birl.utc_now()
+
+  let chunk_size = list.length(packages) / 8
+  let chunks = list.sized_chunk(packages, chunk_size)
+
+  let handles =
+    list.map(chunks, fn(chunk) {
+      task.async(fn() {
+        list.map(chunk, fn(pkg) {
+          process.sleep(1000)
+          io.println("Getting downloads - " <> pkg)
+          fetch_package(pkg, state.hex_key)
+        })
+      })
+    })
+
+  let _ =
+    list.fold(handles, [], fn(acc, handle) {
+      let result = task.await(handle, 3_600_000)
+      list.concat([result, acc])
+    })
+    |> list.fold("", fn(b, a) { b <> create_package_downloads(a) })
+    |> insert_data_tb(state.tinybird_key, "package_daily_downloads")
+
+  io.println(
+    "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
+  )
 }
 
 fn get_list_gleam_packages(state: State) {
