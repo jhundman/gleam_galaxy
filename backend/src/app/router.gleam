@@ -15,7 +15,7 @@ pub fn middleware(
   handle_request(req)
 }
 
-pub fn handle_request(req: Request) -> Response {
+pub fn handle_request(req: Request, tb_key: String) -> Response {
   use _req <- middleware(req)
 
   case wisp.path_segments(req) {
@@ -25,7 +25,7 @@ pub fn handle_request(req: Request) -> Response {
       |> wisp.json_response(200)
     }
 
-    ["api", ..] -> handle_api_request(req)
+    ["api", ..] -> handle_api_request(req, tb_key)
 
     _ -> {
       wisp.response(404)
@@ -40,6 +40,11 @@ pub fn default_responses(handle_request: fn() -> wisp.Response) -> wisp.Response
       json.object([#("message", json.string("Are you lost fellow traveler?"))])
       |> json.to_string_builder
       |> wisp.json_response(404)
+    }
+    400 -> {
+      json.object([#("message", json.string("Try again"))])
+      |> json.to_string_builder
+      |> wisp.json_response(400)
     }
 
     _ -> response

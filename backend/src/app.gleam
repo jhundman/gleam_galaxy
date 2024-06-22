@@ -22,7 +22,7 @@ pub fn main() {
   use tinybird_key <- try(env.get_string("TINYBIRD_KEY"))
 
   let assert Ok(_) =
-    wisp.mist_handler(router.handle_request, secret_key_base)
+    wisp.mist_handler(router.handle_request(_, tinybird_key), secret_key_base)
     |> mist.new
     |> mist.port(8000)
     |> mist.start_http
