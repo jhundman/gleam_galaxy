@@ -1,9 +1,10 @@
-import app/models.{type Statistics, Meta}
-import birl.{type Time}
+// import birl.{type Time}
 import gleam/dynamic.{type DecodeError, type Dynamic} as dyn
-import gleam/io
+
+// import gleam/io
 import gleam/json
 import gleam/list
+import gleam_galaxy/models.{type Statistics, Meta}
 
 pub type SearchResponse {
   SearchResponse(
@@ -29,7 +30,7 @@ pub fn decode_search(data: Dynamic) -> Result(SearchResponse, List(DecodeError))
     dyn.field(
       "meta",
       dyn.list(dyn.decode2(
-        models.Meta,
+        Meta,
         dyn.field("name", dyn.string),
         dyn.field("type", dyn.string),
       )),

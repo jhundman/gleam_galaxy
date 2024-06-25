@@ -1,14 +1,15 @@
-import app/api/service
-import app/error.{type Error}
 import gleam/hackney
 import gleam/http
 import gleam/http/request
-import gleam/http/response
-import gleam/int
+
+// import gleam/http/response
+// import gleam/int
 import gleam/io
 import gleam/json
 import gleam/list
 import gleam/result
+import gleam_galaxy/api/service
+import gleam_galaxy/error
 import wisp.{type Request, type Response}
 
 pub fn handle_api_request(req: Request, tb_key: String) -> Response {
@@ -64,7 +65,7 @@ fn get_home() -> Response {
   |> wisp.json_response(200)
 }
 
-fn get_package(req: Request, pkg: String) -> Response {
+fn get_package(_req: Request, pkg: String) -> Response {
   json.object([#("message", json.string("You requested: " <> pkg))])
   |> json.to_string_builder
   |> wisp.json_response(200)

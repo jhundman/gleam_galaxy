@@ -1,7 +1,7 @@
-import app/models.{type Meta, type Statistics}
-import birl
+// import birl
 import gleam/dynamic.{type DecodeError, type Dynamic} as dyn
 import gleam/io
+import gleam_galaxy/models.{type Meta, type Statistics}
 
 // Max Updated At
 pub type UpdateData {

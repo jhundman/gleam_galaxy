@@ -1,6 +1,6 @@
-import app/api/web.{handle_api_request}
-import gleam/io
+// import gleam/io
 import gleam/json
+import gleam_galaxy/api/web.{handle_api_request}
 import wisp.{type Request, type Response}
 
 pub fn middleware(

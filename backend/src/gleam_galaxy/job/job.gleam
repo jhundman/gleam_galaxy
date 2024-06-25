@@ -1,6 +1,3 @@
-import app/error.{type Error}
-import app/job/job_models
-import app/models.{type State}
 import birl.{type Time}
 import birl/duration
 import gleam/dict
@@ -20,6 +17,9 @@ import gleam/otp/task
 import gleam/result
 import gleam/string
 import gleam/uri
+import gleam_galaxy/error.{type Error}
+import gleam_galaxy/job/job_models
+import gleam_galaxy/models.{type State}
 
 // import pprint as pp
 import shakespeare/actors/periodic.{Ms, start}
