@@ -17,9 +17,9 @@ pub fn handle_api_request(req: Request, tb_key: String) -> Response {
   case list.drop(wisp.path_segments(req), 1) {
     ["search"] -> search_packages(req, tb_key)
     ["home"] -> get_home()
-    ["package", pkg] -> get_package(req, pkg)
+    ["package", pkg] -> get_package(pkg, tb_key)
     [] -> {
-      io.println("made it here 2")
+      io.println("API Home")
       wisp.response(200)
     }
     _ -> {
@@ -65,8 +65,20 @@ fn get_home() -> Response {
   |> wisp.json_response(200)
 }
 
-fn get_package(_req: Request, pkg: String) -> Response {
-  json.object([#("message", json.string("You requested: " <> pkg))])
-  |> json.to_string_builder
+fn get_package(pkg: String, tb_key: String) {
+  let assert Ok(response) =
+    request.new()
+    |> request.set_host("api.us-east.tinybird.co")
+    |> request.set_path("/v0/pipes/get_package.json")
+    |> request.set_query([#("pkg", pkg)])
+    |> request.prepend_header("Authorization", "Bearer " <> tb_key)
+    |> hackney.send()
+
+  let assert Ok(pkg_response) =
+    json.decode(response.body, using: service.decode_package)
+    |> result.map_error(error.JsonDecodeError)
+
+  service.encode_package(pkg_response)
+  |> json.to_string_builder()
   |> wisp.json_response(200)
 }
