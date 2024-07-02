@@ -156,3 +156,66 @@ pub fn encode_package(pkg: PackageResponse) {
 
   json.object([#("data", json.preprocessed_array(recs))])
 }
+
+/// Home
+pub type HomeResponse {
+  HomeResponse(
+    meta: List(models.Meta),
+    data: List(HomeRecord),
+    rows: Int,
+    statistics: Statistics,
+  )
+}
+
+pub type HomeRecord {
+  HomeRecord(num_packages: Int, total_downloads: Int)
+}
+
+pub fn decode_home(data: Dynamic) -> Result(HomeResponse, List(DecodeError)) {
+  dyn.decode4(
+    HomeResponse,
+    dyn.field(
+      "meta",
+      dyn.list(dyn.decode2(
+        Meta,
+        dyn.field("name", dyn.string),
+        dyn.field("type", dyn.string),
+      )),
+    ),
+    dyn.field(
+      "data",
+      dyn.list(dyn.decode2(
+        HomeRecord,
+        dyn.field("num_packages", dyn.int),
+        dyn.field("total_downloads", dyn.int),
+      )),
+    ),
+    dyn.field("rows", dyn.int),
+    dyn.field(
+      "statistics",
+      dyn.decode3(
+        models.Statistics,
+        dyn.field("elapsed", dyn.float),
+        dyn.field("rows_read", dyn.int),
+        dyn.field("bytes_read", dyn.int),
+      ),
+    ),
+  )(data)
+}
+
+pub fn encode_home(pkg: HomeResponse) {
+  let recs = case list.first(pkg.data) {
+    Ok(first) -> first
+    Error(_) -> HomeRecord(0, 0)
+  }
+
+  json.object([
+    #(
+      "data",
+      json.object([
+        #("num_packages", json.int(recs.num_packages)),
+        #("total_downloads", json.int(recs.total_downloads)),
+      ]),
+    ),
+  ])
+}

@@ -41,6 +41,7 @@ pub fn start_sync(hex_key: String, tinybird_key: String) {
     )
 
   // Periodic actor takes a function, and sync needs state. Run every 10hr to get 2x a day
+  // 36_000_000
   let cron = fn() { sync_data(state) }
   start(do: cron, every: Ms(36_000_000))
 }
@@ -86,13 +87,19 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
     |> result.map_error(error.JsonDecodeError),
   )
 
+  let init =
+    birl.utc_now()
+    |> birl.subtract(duration.years(5))
+
   let max_time = case list.first(max_update.data) {
     Ok(t) -> birl.parse(t.max_updated_at)
-    Error(_) -> Ok(birl.utc_now())
+    Error(_) ->
+      init
+      |> Ok()
   }
 
   max_time
-  |> result.unwrap(birl.utc_now())
+  |> result.unwrap(init)
   |> birl.subtract(duration.hours(8))
   |> Ok()
 }
@@ -100,17 +107,20 @@ pub fn get_max_package_updated_at(tinybird_key: String) {
 /// Sync Package Updates ==========================================================================
 fn sync_updates(state: State) {
   use packages <- result.try(fetch_packages(state))
+  io.println("LIST LENGTH:" <> int.to_string(list.length(packages)))
+
   use min_date <- result.try(min_timestamp(packages))
   let start = birl.utc_now()
 
   // 100 / chunk size = num_tasks
-  let chunks = list.sized_chunk(packages, 10)
+  let chunks = list.sized_chunk(packages, 20)
+  // io.println("Chunk LENGTH:" <> int.to_string(list.length(chunks)))
 
   let handles =
     list.map(chunks, fn(chunk) {
       task.async(fn() {
         list.map(chunk, fn(pkg) {
-          process.sleep(100)
+          process.sleep(200)
           process_package(pkg, state)
         })
       })
@@ -122,11 +132,13 @@ fn sync_updates(state: State) {
       list.concat([result, acc])
     })
 
-  io.debug(list.length(pkgs))
+  io.println("pkgs LENGTH:" <> int.to_string(list.length(pkgs)))
+
+  // io.debug(list.length(pkgs))
   io.println(
     "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
   )
-  process.sleep(30_000)
+  process.sleep(60_000)
 
   // If min package updated at greater than or equal to max tb date
   // then keep looping as have not seen all packages
@@ -173,6 +185,7 @@ fn min_timestamp(packages: List(hexpm.Package)) -> Result(Time, Error) {
 }
 
 fn fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
+  io.println("Page: " <> int.to_string(state.page))
   use response <- result.try(
     request.new()
     |> request.set_host("hex.pm")
@@ -196,7 +209,7 @@ fn process_package(package: hexpm.Package, state: State) {
   use releases <- result.try(lookup_gleam_releases(package, state.hex_key))
   case releases {
     [] -> {
-      // io.println(package.name <> " - NO GLEAM RELEASES")
+      io.println(package.name <> " - NO GLEAM RELEASES")
       Ok(state)
     }
     _ -> {
@@ -250,6 +263,20 @@ fn lookup_release(
     |> hackney.send
     |> result.map_error(error.HttpClientError),
   )
+
+  case response.status > 299 {
+    True ->
+      io.print_error(
+        "RELEASE REQUEST: "
+        <> url.path
+        <> " "
+        <> release.version
+        <> " "
+        <> int.to_string(response.status)
+        <> response.body,
+      )
+    _ -> Nil
+  }
 
   json.decode(response.body, using: hexpm.decode_release)
   |> result.map_error(error.JsonDecodeError)
@@ -413,7 +440,7 @@ fn sync_downloads(state: State) {
 
   let start = birl.utc_now()
 
-  let chunk_size = list.length(packages) / 8
+  let chunk_size = list.length(packages) / 5
   let chunks = list.sized_chunk(packages, chunk_size)
 
   let handles =
