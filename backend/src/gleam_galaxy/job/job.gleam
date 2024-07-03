@@ -60,11 +60,11 @@ fn sync_data(state: State) -> Nil {
 
   // Sync Updates
   wisp.log_info("===== Sync Updates =====")
-  // let _ = sync_updates(state)
+  let _ = sync_updates(state)
 
   // Sync Downloads
   wisp.log_info("===== Sync Downloads =====")
-  // let _ = sync_downloads(state)
+  let _ = sync_downloads(state)
 
   wisp.log_info(
     "Cron Job Completed at: " <> state.current_time |> birl.to_iso8601,
@@ -113,14 +113,14 @@ fn sync_updates(state: State) {
   let start = birl.utc_now()
 
   // 100 / chunk size = num_tasks
-  let chunks = list.sized_chunk(packages, 20)
+  let chunks = list.sized_chunk(packages, 100)
   // io.println("Chunk LENGTH:" <> int.to_string(list.length(chunks)))
 
   let handles =
     list.map(chunks, fn(chunk) {
       task.async(fn() {
         list.map(chunk, fn(pkg) {
-          process.sleep(200)
+          process.sleep(1000)
           process_package(pkg, state)
         })
       })
@@ -128,7 +128,7 @@ fn sync_updates(state: State) {
 
   let pkgs =
     list.fold(handles, [], fn(acc, handle) {
-      let result = task.await(handle, 60_000)
+      let result = task.await(handle, 600_000)
       list.concat([result, acc])
     })
 
@@ -138,7 +138,7 @@ fn sync_updates(state: State) {
   io.println(
     "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
   )
-  process.sleep(60_000)
+  process.sleep(30_000)
 
   // If min package updated at greater than or equal to max tb date
   // then keep looping as have not seen all packages
@@ -402,6 +402,18 @@ pub fn fetch_package(package_name: String, hex_key: String) {
     |> result.map_error(error.HttpClientError),
   )
 
+  case response.status > 299 {
+    True ->
+      io.print_error(
+        "Package REQUEST: "
+        <> package_name
+        <> " "
+        <> int.to_string(response.status)
+        <> response.body,
+      )
+    _ -> Nil
+  }
+
   use package <- result.try(
     json.decode(response.body, using: hexpm.decode_package)
     |> result.map_error(error.JsonDecodeError),
@@ -440,7 +452,7 @@ fn sync_downloads(state: State) {
 
   let start = birl.utc_now()
 
-  let chunk_size = list.length(packages) / 5
+  let chunk_size = list.length(packages) / 1
   let chunks = list.sized_chunk(packages, chunk_size)
 
   let handles =
