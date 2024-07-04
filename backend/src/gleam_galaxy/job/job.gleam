@@ -60,11 +60,11 @@ fn sync_data(state: State) -> Nil {
 
   // Sync Updates
   wisp.log_info("===== Sync Updates =====")
-  let _ = sync_updates(state)
+  // let _ = sync_updates(state)
 
   // Sync Downloads
   wisp.log_info("===== Sync Downloads =====")
-  let _ = sync_downloads(state)
+  // let _ = sync_downloads(state)
 
   wisp.log_info(
     "Cron Job Completed at: " <> state.current_time |> birl.to_iso8601,

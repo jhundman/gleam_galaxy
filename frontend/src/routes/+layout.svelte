@@ -35,37 +35,33 @@
 	<link rel="preload" as="font" href={lexend_900} type="font/woff2" crossorigin="anonymous" />
 </svelte:head>
 
-<div class="mx-auto flex max-w-screen-lg justify-center p-6">
-	<div class="flex w-full flex-col gap-2 p-4">
-		<div class="gradient-text flex justify-center text-4xl antialiased">
-			<h1>
-				<a href="/" target="_self" tabindex="-1">Gleam Galaxy</a>
-			</h1>
-		</div>
-		<div class="flex justify-center text-sm text-muted-foreground">
-			<p>search among the stars</p>
-		</div>
+<div class="mx-auto grid min-h-screen max-w-screen-lg grid-rows-[2fr_9fr_1fr] gap-4 pt-12">
+	<div class=" grid justify-items-center">
+		<h1 class="gradient-text text-4xl antialiased">
+			<a href="/" target="_self" tabindex="-1">Gleam Galaxy</a>
+		</h1>
+		<p class="pb-4 text-sm text-muted-foreground">search among the stars</p>
+		<Input
+			class="max-w-96 rounded-xl border-2 transition-shadow duration-200 ease-in-out focus:shadow-[0_1px_20px_0px_rgba(166,241,252,.15)] focus-visible:border-[#fefefc]"
+			placeholder="a gleam package"
+		/>
+	</div>
 
-		<div class="flex justify-center p-6">
-			<Input
-				class=" max-w-96 rounded-2xl transition-shadow duration-200 ease-in-out focus:shadow-[0_2px_30px_0px_rgba(166,241,252,.25)] focus-visible:border-[#fefefc]"
-				placeholder="a gleam package"
-			/>
-		</div>
-		<div class="min-h-[400px]"><slot /></div>
+	<div class="py-4">
+		<slot />
+	</div>
 
-		<div class="flex justify-between space-x-4 pb-2 pt-24">
-			<a
-				class="transition duration-200 ease-linear hover:text-primary"
-				href="https://twitter.com/jhundma"
-				tabindex="-1"
-			>
-				by Hayes Hundman
-			</a>
-			<a href="https://github.com/jhundman" tabindex="-1">
-				<Github />
-			</a>
-		</div>
+	<div class="grid grid-cols-2 justify-items-center gap-4">
+		<a
+			class="transition duration-200 ease-linear hover:text-primary"
+			href="https://twitter.com/jhundma"
+			tabindex="-1"
+		>
+			by Hayes Hundman
+		</a>
+		<a href="https://github.com/jhundman" tabindex="-1">
+			<Github />
+		</a>
 	</div>
 </div>
 
