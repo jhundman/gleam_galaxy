@@ -21,6 +21,17 @@
 
 	import { Input } from '$lib/components/ui/input';
 	import Github from '$lib/components/custom/github.svelte';
+
+	import { goto } from '$app/navigation';
+
+	let packageName = '';
+
+	function handleSubmit(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			goto(`/${packageName}`);
+			packageName = '';
+		}
+	}
 </script>
 
 <svelte:head>
@@ -44,6 +55,8 @@
 		<Input
 			class="max-w-96 rounded-xl border-2 transition-shadow duration-200 ease-in-out focus:shadow-[0_1px_20px_0px_rgba(166,241,252,.15)] focus-visible:border-[#fefefc]"
 			placeholder="a gleam package"
+			bind:value={packageName}
+			on:keydown={handleSubmit}
 		/>
 	</div>
 

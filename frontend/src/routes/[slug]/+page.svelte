@@ -1,22 +1,23 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	export let data: PageData;
-	let string_data = JSON.stringify(data);
+	let package_data = null;
+	$: package_data = data.payload.data[0];
 </script>
 
-<div>
-	<h1>Package: {data.package.package_name}</h1>
-	<p>Hex URL: <a href={data.package.hex_url}>{data.package.hex_url}</a></p>
-	<p>Description: {data.package.description}</p>
-	<p>Licenses: {data.package.licenses.join(', ')}</p>
-	<p>Repository URL: <a href={data.package.repository_url}>{data.package.repository_url}</a></p>
-	<p>Downloads (all time): {data.package.downloads_all_time}</p>
-	<p>Hex Inserted At: {data.package.hex_inserted_at}</p>
-	<p>Hex Updated At: {data.package.hex_updated_at}</p>
-	<h2>Daily Downloads</h2>
-	<ul>
-		{#each data.package.daily_downloads as daily_download}
-			<li>{daily_download.date}: {daily_download.downloads} downloads</li>
-		{/each}
-	</ul>
-</div>
+{#if package_data}
+	<div>
+		<!-- <p>CURRENT SLUG {currentSlug}</p> -->
+		<h2>{package_data.package_name}</h2>
+		<p>Hex URL: <a href={package_data.hex_url}>{package_data.hex_url}</a></p>
+		<p>Description: {package_data.description}</p>
+		<p>Licenses: {package_data.licenses.join(', ')}</p>
+		<p>Repository URL: <a href={package_data.repository_url}>{package_data.repository_url}</a></p>
+		<p>Owners: {package_data.owners.join(', ')}</p>
+		<p>Downloads: {package_data.downloads_all_time}</p>
+		<p>Hex Updated At: {package_data.hex_updated_at}</p>
+		<p>Hex Inserted At: {package_data.hex_inserted_at}</p>
+	</div>
+{:else}
+	<div>Not found</div>
+{/if}
