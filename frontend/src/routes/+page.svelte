@@ -27,7 +27,8 @@
 			>{' '}downloads from hexpm.
 		</p>
 	</div>
-	<div class="grid grid-cols-2 gap-8">
+
+	<!-- <div class="grid grid-cols-2 gap-8">
 		<div class="flex justify-center border-2">2</div>
 		<div class="flex justify-center border-2">3</div>
 	</div>
@@ -35,5 +36,5 @@
 	<div class="grid grid-cols-2 gap-8">
 		<a class="flex justify-center border-2" tabindex="-1" href="/wisp">wisp</a>
 		<a class="flex justify-center border-2" tabindex="-1" href="/wisp">wisp</a>
-	</div>
+	</div> -->
 </div>

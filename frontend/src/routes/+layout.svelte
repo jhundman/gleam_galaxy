@@ -19,19 +19,8 @@
 	import '@fontsource/lexend/900.css';
 	import lexend_900 from '@fontsource/lexend/files/lexend-latin-900-normal.woff2';
 
-	import { Input } from '$lib/components/ui/input';
 	import Github from '$lib/components/custom/github.svelte';
-
-	import { goto } from '$app/navigation';
-
-	let packageName = '';
-
-	function handleSubmit(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
-			goto(`/${packageName}`);
-			packageName = '';
-		}
-	}
+	import SearchCommand from '$lib/components/custom/search-command.svelte';
 </script>
 
 <svelte:head>
@@ -51,13 +40,9 @@
 		<h1 class="gradient-text text-4xl antialiased">
 			<a href="/" target="_self" tabindex="-1">Gleam Galaxy</a>
 		</h1>
-		<p class="pb-4 text-sm text-muted-foreground">search among the stars</p>
-		<Input
-			class="max-w-96 rounded-xl border-2 transition-shadow duration-200 ease-in-out focus:shadow-[0_1px_20px_0px_rgba(166,241,252,.15)] focus-visible:border-[#fefefc]"
-			placeholder="a gleam package"
-			bind:value={packageName}
-			on:keydown={handleSubmit}
-		/>
+		<p class=" text-sm text-muted-foreground">search among the stars</p>
+
+		<SearchCommand />
 	</div>
 
 	<div class="py-4">
