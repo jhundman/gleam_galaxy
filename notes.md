@@ -2,19 +2,19 @@
 
 ## TODO
 ### v0.1
-- cron job capture hex stats
-- Backend Gleam APIs
+[x] cron job capture hex stats
+[] Backend Gleam APIs
   - Package Search
   - Summary Stats (basic)
   - Package Stats (basic)
 - Frontend
-  - Display summary stats
+  [x] Display summary stats
   - Display Package stats
   - Basic Graphs
 - Deploy (CF and Fly)
 
 ### v1.0
-- More Graphics
+- More Graphics/Stats
 - Easter egg (Rainbow Road)
 - More robust backend
   - Better error handling

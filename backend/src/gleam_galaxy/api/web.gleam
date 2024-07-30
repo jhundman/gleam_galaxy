@@ -30,6 +30,7 @@ pub fn handle_api_request(req: Request, tb_key: String) -> Response {
 }
 
 fn search_packages(req, tb_key: String) -> Response {
+  io.debug("Here")
   case wisp.get_query(req) {
     [#("query", q)] -> {
       let assert Ok(response) =
@@ -40,6 +41,9 @@ fn search_packages(req, tb_key: String) -> Response {
         |> request.prepend_header("Authorization", "Bearer " <> tb_key)
         |> hackney.send
         |> result.map_error(error.HttpClientError)
+
+      io.debug("HERE")
+      io.debug(response)
 
       let assert Ok(search_response) =
         json.decode(response.body, using: service.decode_search)
