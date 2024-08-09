@@ -97,6 +97,19 @@ pub type PackageRecord {
   )
 }
 
+pub type PackageHistoryResponse {
+  PackageHistoryResponse(
+    meta: List(models.Meta),
+    data: List(PackageHistory),
+    rows: Int,
+    statistics: Statistics,
+  )
+}
+
+pub type PackageHistory {
+  PackageHistory(package_name: String, downloads: Int, date: String)
+}
+
 pub fn decode_package(
   data: Dynamic,
 ) -> Result(PackageResponse, List(DecodeError)) {
@@ -138,7 +151,42 @@ pub fn decode_package(
   )(data)
 }
 
-pub fn encode_package(pkg: PackageResponse) {
+pub fn decode_package_history(
+  data: Dynamic,
+) -> Result(PackageHistoryResponse, List(DecodeError)) {
+  dyn.decode4(
+    PackageHistoryResponse,
+    dyn.field(
+      "meta",
+      dyn.list(dyn.decode2(
+        Meta,
+        dyn.field("name", dyn.string),
+        dyn.field("type", dyn.string),
+      )),
+    ),
+    dyn.field(
+      "data",
+      dyn.list(dyn.decode3(
+        PackageHistory,
+        dyn.field("package_name", dyn.string),
+        dyn.field("downloads", dyn.int),
+        dyn.field("date", dyn.string),
+      )),
+    ),
+    dyn.field("rows", dyn.int),
+    dyn.field(
+      "statistics",
+      dyn.decode3(
+        models.Statistics,
+        dyn.field("elapsed", dyn.float),
+        dyn.field("rows_read", dyn.int),
+        dyn.field("bytes_read", dyn.int),
+      ),
+    ),
+  )(data)
+}
+
+pub fn encode_package(pkg: PackageResponse, pkg_history: PackageHistoryResponse) {
   let recs =
     list.map(pkg.data, fn(x) {
       json.object([
@@ -154,7 +202,19 @@ pub fn encode_package(pkg: PackageResponse) {
       ])
     })
 
-  json.object([#("data", json.preprocessed_array(recs))])
+  let history =
+    list.map(pkg_history.data, fn(x) {
+      json.object([
+        #("package_name", json.string(x.package_name)),
+        #("downloads", json.int(x.downloads)),
+        #("date", json.string(x.date)),
+      ])
+    })
+
+  json.object([
+    #("data", json.preprocessed_array(recs)),
+    #("history", json.preprocessed_array(history)),
+  ])
 }
 
 /// Home

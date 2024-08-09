@@ -2,10 +2,14 @@
 	import * as Command from '$lib/components/ui/command/index.js';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import Shortcut from '$lib/components/custom/shortcut.svelte';
 
 	// Input
 	let open = false;
 	let value = 'home';
+	function open_dialog() {
+		open = !open;
+	}
 
 	onMount(() => {
 		function handleKeydown(e: KeyboardEvent) {
@@ -43,16 +47,22 @@
 
 	let searchTerm = '';
 	let searchResults: SearchResult[] = [];
+	let timer: ReturnType<typeof setTimeout>;
 
-	async function handleSearch(searchTerm: string) {
-		if (searchTerm.length === 0) {
+	const debouncedSearch = (term: string) => {
+		clearTimeout(timer);
+		timer = setTimeout(() => {
+			handleSearch(term);
+		}, 250);
+	};
+
+	async function handleSearch(term: string) {
+		if (term.length === 0) {
 			searchResults = [];
-			return searchResults;
+			return;
 		}
-
-		searchResults = await performSearch(searchTerm);
+		searchResults = await performSearch(term);
 		console.log(searchResults);
-		return searchResults;
 	}
 
 	async function performSearch(term: string): Promise<SearchResult[]> {
@@ -70,17 +80,13 @@
 	}
 
 	$: {
-		handleSearch(searchTerm);
+		debouncedSearch(searchTerm);
 	}
 </script>
 
 <p class="text-md pb-4 text-muted-foreground">
 	Press
-	<kbd
-		class="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100"
-	>
-		<span class="text-sm">⌘</span>K
-	</kbd>
+	<button on:click={open_dialog}><Shortcut /></button>
 	to search
 </p>
 
@@ -89,18 +95,24 @@
 	bind:open
 	bind:value
 	loop
-	class="max-w-screen-sm border-2 border-border bg-background"
+	class="max-w-screen-sm bg-background"
 >
 	<Command.Input bind:value={searchTerm} class="text-foreground" placeholder="Search packages" />
 	<Command.List>
-		<Command.Empty>No results found.</Command.Empty>
-		<Command.Group heading="General">
+		{#if searchResults.length > 0}
+			<Command.Group heading="Packages">
+				{#each searchResults as pkg}
+					<Command.Item value={pkg.package_name}>
+						{pkg.package_name}
+						<div class="absoluteright-0 ml-auto flex justify-center text-sm opacity-50">
+							Downloads: {pkg.downloads_all_time}
+						</div>
+					</Command.Item>
+				{/each}
+			</Command.Group>
+		{/if}
+		<Command.Group heading="Home">
 			<Command.Item>Home</Command.Item>
-		</Command.Group>
-		<Command.Group heading="Packages">
-			{#each searchResults as pkg}
-				<Command.Item>{pkg.package_name}</Command.Item>
-			{/each}
 		</Command.Group>
 	</Command.List>
 </Command.Dialog>

@@ -35,21 +35,20 @@
 	<link rel="preload" as="font" href={lexend_900} type="font/woff2" crossorigin="anonymous" />
 </svelte:head>
 
-<div class="mx-auto grid min-h-screen max-w-screen-lg grid-rows-[2fr_9fr_1fr] gap-4 pt-12">
-	<div class=" grid justify-items-center">
+<div class="mx-auto flex min-h-[100dvh] max-w-screen-lg flex-col px-6">
+	<header class="grid justify-items-center pb-8 pt-12">
 		<h1 class="gradient-text text-4xl antialiased">
 			<a href="/" target="_self" tabindex="-1">Gleam Galaxy</a>
 		</h1>
-		<p class=" text-sm text-muted-foreground">search among the stars</p>
-
+		<p class="p-2 pb-4 text-sm text-muted-foreground">search among the stars</p>
 		<SearchCommand />
-	</div>
+	</header>
 
-	<div class="py-4">
+	<main class="flex-grow py-4">
 		<slot />
-	</div>
+	</main>
 
-	<div class="grid grid-cols-2 justify-items-center gap-4">
+	<footer class="grid grid-cols-2 justify-items-center gap-4 p-8">
 		<a
 			class="transition duration-200 ease-linear hover:text-primary"
 			href="https://twitter.com/jhundma"
@@ -60,7 +59,7 @@
 		<a href="https://github.com/jhundman" tabindex="-1">
 			<Github />
 		</a>
-	</div>
+	</footer>
 </div>
 
 <style>

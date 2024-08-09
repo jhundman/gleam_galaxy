@@ -2,7 +2,9 @@
 	import type { PageData } from './$types';
 	export let data: PageData;
 	let package_data = null;
+	let package_history = null;
 	$: package_data = data.payload.data[0];
+	$: package_history = data.payload.history;
 </script>
 
 {#if package_data}
@@ -20,4 +22,11 @@
 	</div>
 {:else}
 	<div>Not found</div>
+{/if}
+
+{#if package_history}
+	{#each package_history as rec}
+		<p>{rec.downloads}</p>
+		<p>{rec.date}</p>
+	{/each}
 {/if}
