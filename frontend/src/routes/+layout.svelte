@@ -38,7 +38,7 @@
 </svelte:head> -->
 
 <div class="mx-auto flex min-h-[100dvh] max-w-screen-lg flex-col px-6">
-	<header class="grid justify-items-center pb-8 pt-8">
+	<header class="grid justify-items-center pb-8 pt-4">
 		<h1 class="gradient-text text-4xl antialiased">
 			<a href="/" target="_self" tabindex="-1">Gleam Galaxy</a>
 		</h1>

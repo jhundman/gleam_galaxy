@@ -3,10 +3,23 @@
 	import Link from '$lib/components/custom/link.svelte';
 	import type { PageData } from './$types';
 	export let data: PageData;
+	function formatNumber(num: number): string {
+		if (num >= 1_000_000_000_000) {
+			return (num / 1_000_000_000_000).toFixed(1) + ' T';
+		} else if (num >= 1_000_000_000) {
+			return (num / 1_000_000_000).toFixed(1) + ' B';
+		} else if (num >= 1_000_000) {
+			return (num / 1_000_000).toFixed(2) + ' M';
+		} else if (num >= 1_000) {
+			return (num / 1_000).toFixed(2) + 'K';
+		} else {
+			return num.toString();
+		}
+	}
 </script>
 
-<div class="flex flex-wrap justify-center gap-6">
-	<Card.Root class="h-36 w-52 overflow-hidden border-hidden bg-card shadow-lg">
+<div class="flex flex-wrap justify-center gap-4">
+	<Card.Root class="flex-1  overflow-hidden border-hidden bg-card shadow-lg">
 		<Card.Header>
 			<Card.Title class="text-foreground">Links</Card.Title>
 		</Card.Header>
@@ -20,29 +33,22 @@
 			>
 		</Card.Content>
 	</Card.Root>
-	<Card.Root class="h-36 w-52 overflow-hidden border-hidden bg-card shadow-lg">
+	<Card.Root class="flex-1 overflow-hidden border-hidden bg-card shadow-lg">
 		<Card.Header>
 			<Card.Title class="text-foreground">Project Info</Card.Title>
 		</Card.Header>
-		<Card.Content class="text-foreground">
+		<Card.Content class="text-foreground ">
 			<p>Licenses: {data.licenses.join(', ')}</p>
+			<p>Last Updated: {new Date(data.hex_updated_at).toISOString().split('T')[0]}</p>
+			<p>Created: {new Date(data.hex_inserted_at).toISOString().split('T')[0]}</p>
 		</Card.Content>
 	</Card.Root>
-	<Card.Root class="h-36 w-52 overflow-hidden border-hidden bg-card shadow-lg">
+	<Card.Root class="flex-1  overflow-hidden border-hidden bg-card shadow-lg">
 		<Card.Header>
-			<Card.Title class="text-foreground">Total Downloads</Card.Title>
+			<Card.Title class="text-foreground">Package Stats</Card.Title>
 		</Card.Header>
-		<Card.Content class="text-md font-medium text-foreground">
-			{data.downloads_all_time}
-		</Card.Content>
-	</Card.Root>
-	<Card.Root class="h-36 w-52 overflow-hidden border-hidden bg-card shadow-lg">
-		<Card.Header>
-			<Card.Title class="text-foreground">Dates</Card.Title>
-		</Card.Header>
-		<Card.Content class="text-sm text-foreground">
-			<p>Last Updated: {new Date(data.hex_updated_at).toLocaleDateString()}</p>
-			<p>Created: {new Date(data.hex_inserted_at).toLocaleDateString()}</p>
+		<Card.Content class=" font-medium text-foreground">
+			Downloads: {formatNumber(data.downloads_all_time)}
 		</Card.Content>
 	</Card.Root>
 </div>
