@@ -5,3 +5,5 @@ To illuminate the stars in the Gleam galaxy.
 
 
 ## Deploy
+`cd backend`
+`fly deploy`
