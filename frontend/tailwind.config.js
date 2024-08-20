@@ -60,7 +60,7 @@ const config = {
 				'2xl': '1536px'
 			},
 			fontFamily: {
-				sans: ['Lexend', '-apple-system', 'sans-serif']
+				sans: ['Inter', '-apple-system', 'sans-serif']
 			}
 		}
 	}

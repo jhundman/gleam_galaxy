@@ -2,7 +2,6 @@
 	import * as Command from '$lib/components/ui/command/index.js';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import Shortcut from '$lib/components/custom/shortcut.svelte';
 
 	// Input
 	let open = false;
@@ -53,7 +52,7 @@
 		clearTimeout(timer);
 		timer = setTimeout(() => {
 			handleSearch(term);
-		}, 250);
+		}, 50);
 	};
 
 	async function handleSearch(term: string) {
@@ -84,9 +83,14 @@
 	}
 </script>
 
-<p class="text-md pb-4 text-muted-foreground">
-	Press
-	<button on:click={open_dialog}><Shortcut /></button>
+<p class="text-md pb-2 text-muted-foreground">
+	<button on:click={open_dialog}>
+		<kbd
+			class="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-foreground px-1.5 font-mono text-xs font-medium text-muted-foreground opacity-100"
+		>
+			<span class="text-sm">⌘K or Ctrl+K</span>
+		</kbd>
+	</button>
 	to search
 </p>
 
