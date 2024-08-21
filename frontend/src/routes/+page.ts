@@ -1,7 +1,8 @@
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch, setHeaders }) => {
-	const url = `/api/home`;
+	// Need to update api path lol, leftover from proxy
+	const url = `/api/api/home`;
 	const response = await fetch(url);
 	const payload = await response.json();
 

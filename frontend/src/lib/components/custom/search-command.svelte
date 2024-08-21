@@ -66,7 +66,7 @@
 
 	async function performSearch(term: string): Promise<SearchResult[]> {
 		try {
-			const response = await fetch(`/api/search?query=${term}`);
+			const response = await fetch(`/api/api/search?query=${term}`);
 			if (!response.ok) {
 				throw new Error(`HTTP error! status: ${response.status}`);
 			}

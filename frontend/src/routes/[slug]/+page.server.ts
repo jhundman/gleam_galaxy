@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
-	const url = `/api/package/${params.slug}`;
+	const url = `/api/api/package/${params.slug}`;
 	const response = await fetch(url);
 	const payload = await response.json();
 
