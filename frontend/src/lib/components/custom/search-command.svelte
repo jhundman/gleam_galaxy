@@ -6,8 +6,12 @@
 	// Input
 	let open = false;
 	let value = 'home';
-	function open_dialog() {
+	function trigger_dialog() {
 		open = !open;
+	}
+
+	function close_dialog() {
+		open = false;
 	}
 
 	onMount(() => {
@@ -25,10 +29,10 @@
 				console.log(e);
 				if (value === 'home') {
 					goto('/');
-					open = !open;
+					open = false;
 				} else {
 					goto(`/${value}`);
-					open = !open;
+					open = false;
 				}
 			}
 		}
@@ -87,7 +91,7 @@
 </script>
 
 <p class="text-md pb-2 text-muted-foreground">
-	<button on:click={open_dialog}>
+	<button on:click={close_dialog}>
 		<kbd
 			class="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-foreground px-1.5 font-mono text-xs font-medium text-muted-foreground opacity-100"
 		>
@@ -109,7 +113,7 @@
 		{#if searchResults.length > 0}
 			<Command.Group heading="Packages">
 				{#each searchResults as pkg}
-					<a tabindex="-1" href={`/${pkg.package_name}`} on:mouseup={open_dialog}>
+					<a tabindex="-1" href={`/${pkg.package_name}`} on:mouseup={close_dialog}>
 						<Command.Item class="hover:cursor-pointer" value={pkg.package_name}>
 							{pkg.package_name}
 							<div class="absoluteright-0 ml-auto flex justify-center text-sm opacity-50">
@@ -121,7 +125,7 @@
 			</Command.Group>
 		{/if}
 		<Command.Group heading="Home">
-			<a tabindex="-1" href="/" on:mouseup={open_dialog}>
+			<a tabindex="-1" href="/" on:mouseup={close_dialog}>
 				<Command.Item class="hover:cursor-pointer">Home</Command.Item>
 			</a>
 		</Command.Group>
