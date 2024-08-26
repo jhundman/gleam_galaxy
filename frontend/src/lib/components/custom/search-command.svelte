@@ -19,6 +19,9 @@
 			}
 			if (e.key === 'Enter') {
 				e.preventDefault();
+				console.log('Enter key pressed');
+				console.log('Current value:', value);
+				console.log('Open state before:', open);
 				console.log(e);
 				if (value === 'home') {
 					goto('/');
