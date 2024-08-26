@@ -1,5 +1,9 @@
 <script lang="ts">
 	import '../app.pcss';
+	import { browser, dev } from '$app/environment';
+	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import * as Fathom from 'fathom-client';
 
 	// import '@fontsource/lexend/100.css';
 	// import lexend_100 from '@fontsource/lexend/files/lexend-latin-100-normal.woff';
@@ -22,6 +26,26 @@
 
 	import Github from '$lib/components/custom/github.svelte';
 	import SearchCommand from '$lib/components/custom/search-command.svelte';
+
+	let isFirstLoad = true;
+	onMount(() => {
+		if (!dev) {
+			Fathom.load('UPERTBLF', {
+				// optional - add your website domain(s) to avoid views during development
+				//includedDomains: ['www.hayeshundman.io', 'hayeshundman.io']
+			});
+		}
+	});
+
+	// track a page view when the pathname changes
+
+	$: {
+		const currentPath = $page.url.pathname; // eslint-disable-line
+		if (browser && !isFirstLoad && !dev) {
+			Fathom.trackPageview();
+		}
+		isFirstLoad = false;
+	}
 </script>
 
 <!--

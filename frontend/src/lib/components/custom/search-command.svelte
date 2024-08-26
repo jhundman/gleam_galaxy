@@ -106,17 +106,21 @@
 		{#if searchResults.length > 0}
 			<Command.Group heading="Packages">
 				{#each searchResults as pkg}
-					<Command.Item value={pkg.package_name}>
-						{pkg.package_name}
-						<div class="absoluteright-0 ml-auto flex justify-center text-sm opacity-50">
-							Downloads: {pkg.downloads_all_time}
-						</div>
-					</Command.Item>
+					<a href={`/${pkg.package_name}`} on:click={open_dialog}>
+						<Command.Item class="hover:cursor-pointer" value={pkg.package_name}>
+							{pkg.package_name}
+							<div class="absoluteright-0 ml-auto flex justify-center text-sm opacity-50">
+								Downloads: {pkg.downloads_all_time}
+							</div>
+						</Command.Item>
+					</a>
 				{/each}
 			</Command.Group>
 		{/if}
 		<Command.Group heading="Home">
-			<Command.Item>Home</Command.Item>
+			<a href="/" on:click={open_dialog}>
+				<Command.Item class="hover:cursor-pointer">Home</Command.Item>
+			</a>
 		</Command.Group>
 	</Command.List>
 </Command.Dialog>

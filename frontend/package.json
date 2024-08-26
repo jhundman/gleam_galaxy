@@ -44,6 +44,7 @@
 		"clsx": "^2.1.1",
 		"cmdk-sv": "^0.0.18",
 		"d3-quadtree": "^3.0.1",
+		"fathom-client": "^3.7.2",
 		"layercake": "^8.3.4",
 		"lucide-svelte": "^0.407.0",
 		"tailwind-merge": "^2.3.0",
