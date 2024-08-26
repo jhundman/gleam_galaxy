@@ -106,7 +106,7 @@
 		{#if searchResults.length > 0}
 			<Command.Group heading="Packages">
 				{#each searchResults as pkg}
-					<a href={`/${pkg.package_name}`} on:click={open_dialog}>
+					<a href={`/${pkg.package_name}`} on:mouseup={open_dialog}>
 						<Command.Item class="hover:cursor-pointer" value={pkg.package_name}>
 							{pkg.package_name}
 							<div class="absoluteright-0 ml-auto flex justify-center text-sm opacity-50">
@@ -118,7 +118,7 @@
 			</Command.Group>
 		{/if}
 		<Command.Group heading="Home">
-			<a href="/" on:click={open_dialog}>
+			<a href="/" on:mouseup={open_dialog}>
 				<Command.Item class="hover:cursor-pointer">Home</Command.Item>
 			</a>
 		</Command.Group>
