@@ -61,7 +61,7 @@
 	<link rel="preload" as="font" href={lexend_900} type="font/woff2" crossorigin="anonymous" />
 </svelte:head> -->
 
-<div class="mx-auto flex min-h-[100dvh] max-w-screen-lg flex-col px-6">
+<div class="mx-auto flex min-h-[95dvh] max-w-screen-lg flex-col px-6">
 	<header class="grid justify-items-center pb-8 pt-4">
 		<h1 class="gradient-text text-4xl antialiased">
 			<a href="/" target="_self" tabindex="-1">Gleam Galaxy</a>
@@ -80,9 +80,9 @@
 			href="https://twitter.com/jhundma"
 			tabindex="-1"
 		>
-			Made by Hayes Hundman
+			Made by Hayes
 		</a>
-		<a href="https://github.com/jhundman" tabindex="-1">
+		<a href="https://github.com/jhundman/gleam_galaxy" tabindex="-1">
 			<Github />
 		</a>
 	</footer>

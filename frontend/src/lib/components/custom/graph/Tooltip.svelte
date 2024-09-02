@@ -59,7 +59,7 @@
 		<div style="left:{x}px;" class="line"></div>
 
 		<Card.Root
-			class="tooltip text-md rounded-md border-none bg-card transition-all duration-200 ease-out"
+			class="tooltip text-md rounded-md border-none bg-card transition-all duration-0 ease-out"
 			style="
         width:{w}px;
         display: {visible ? 'block' : 'none'};
@@ -89,7 +89,7 @@
 	}
 	.line {
 		transition:
-			left 200ms ease-out,
-			top 200ms ease-out;
+			left 0ms ease-out,
+			top 0ms ease-out;
 	}
 </style>

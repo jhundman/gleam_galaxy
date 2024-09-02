@@ -18,13 +18,15 @@
 	}
 </script>
 
-<div class="grid h-full grid-rows-[1fr_5fr_5fr] gap-14">
+<div class="grid h-full gap-14">
 	<div class="inline-flex justify-center text-lg">
 		<p>
 			Explore <span class="font-semibold text-primary">{home.num_packages}</span>{' '}Gleam packages
 			with over
 			<span class="font-semibold text-primary">{formatNumber(home.total_downloads)}</span
-			>{' '}downloads from hexpm.
+			>{' '}downloads from hexpm. Check out the
+			<a href="https://gleam.run/" class="font-semibold text-primary underline">Gleam Homepage</a> to
+			learn more.
 		</p>
 	</div>
 
