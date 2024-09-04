@@ -19,7 +19,7 @@
 </script>
 
 <div class="flex flex-wrap justify-center gap-4">
-	<Card.Root class="flex-1  overflow-hidden border-hidden bg-card shadow-lg">
+	<Card.Root class="min-w-[225px] flex-1 overflow-hidden border-hidden bg-card shadow-lg">
 		<Card.Header>
 			<Card.Title class="text-foreground">Links</Card.Title>
 		</Card.Header>
@@ -33,7 +33,7 @@
 			>
 		</Card.Content>
 	</Card.Root>
-	<Card.Root class="flex-1 overflow-hidden border-hidden bg-card shadow-lg">
+	<Card.Root class="min-w-[225px] flex-1 overflow-hidden border-hidden bg-card shadow-lg">
 		<Card.Header>
 			<Card.Title class="text-foreground">Project Info</Card.Title>
 		</Card.Header>
@@ -43,7 +43,7 @@
 			<p>Created: {new Date(data.hex_inserted_at).toISOString().split('T')[0]}</p>
 		</Card.Content>
 	</Card.Root>
-	<Card.Root class="flex-1  overflow-hidden border-hidden bg-card shadow-lg">
+	<Card.Root class="min-w-[225px] flex-1 overflow-hidden border-hidden bg-card shadow-lg">
 		<Card.Header>
 			<Card.Title class="text-foreground">Package Stats</Card.Title>
 		</Card.Header>
