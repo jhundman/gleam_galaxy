@@ -16,8 +16,8 @@ Lucy was modified from [Gleam's branding](https://gleam.run/branding/) and is no
 ![Lucy](frontend/static/lucy-galaxy.svg?width=300&height=200)
 
 ## Future Ideas
-[] Enable alerts for Cron Job failures
-[] Add more stats to homepage
-[] Add more stats to package page
-[] Add a data export so others can bulk download
-[] Fix backend route naming lol
+- [] Enable alerts for Cron Job failures
+- [] Add more stats to homepage
+- [] Add more stats to package page
+- [] Add a data export so others can bulk download
+- [] Fix backend route naming
