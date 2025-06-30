@@ -56,7 +56,8 @@ fn sync_data(state: State) -> Nil {
     Ok(t) -> t
     Error(_) ->
       birl.utc_now()
-      |> birl.subtract(duration.years(5))
+      // |> birl.subtract(duration.years(5))
+      |> birl.subtract(duration.hours(5))
   }
 
   let state = models.State(..state, last_updated_at: last_updated_at)

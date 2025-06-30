@@ -1,7 +1,6 @@
 import dot_env
 import gleam/erlang/process
 import gleam/io
-import gleam/result.{try}
 import gleam_galaxy/job/job
 import gleam_galaxy/router
 import glenvy/dotenv

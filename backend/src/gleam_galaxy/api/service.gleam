@@ -1,4 +1,3 @@
-import birl
 import gleam/dynamic.{type DecodeError, type Dynamic} as dyn
 
 // import gleam/io
