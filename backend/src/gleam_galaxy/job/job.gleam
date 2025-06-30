@@ -25,6 +25,8 @@ import gleam_galaxy/models.{type State}
 import shakespeare/actors/periodic.{Ms, start}
 import wisp
 
+// TODO change it from cron process to cron API call. Make API in web
+
 /// Start Cron Job to Sync Hex Packages
 pub fn start_sync(hex_key: String, tinybird_key: String) {
   wisp.log_info("Start Scheduler")
@@ -45,6 +47,8 @@ pub fn start_sync(hex_key: String, tinybird_key: String) {
   let cron = fn() { sync_data(state) }
   start(do: cron, every: Ms(36_000_000))
 }
+
+// TODO - Change to SQLITE instead of TB
 
 /// Job that Syncs Hex Package Data
 fn sync_data(state: State) -> Nil {
