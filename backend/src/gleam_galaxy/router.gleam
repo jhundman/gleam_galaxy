@@ -1,6 +1,7 @@
 // import gleam/io
 import gleam/json
 import gleam_galaxy/api/web.{handle_api_request}
+import sqlight
 import wisp.{type Request, type Response}
 
 pub fn middleware(
@@ -15,7 +16,11 @@ pub fn middleware(
   handle_request(req)
 }
 
-pub fn handle_request(req: Request, tb_key: String) -> Response {
+pub fn handle_request(
+  req: Request,
+  tb_key: String,
+  conn: sqlight.Connection,
+) -> Response {
   use _req <- middleware(req)
 
   case wisp.path_segments(req) {

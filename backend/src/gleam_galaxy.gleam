@@ -23,11 +23,11 @@ fn get_env_with_log(name: String, default: String) -> String {
   }
 }
 
-fn init_db(path: String) {
-  let assert Ok(setup) = simplifile.read("./src/sql/001_setup.sql")
-  io.println(setup)
-  use conn <- sqlight.with_connection(path)
-  todo
+fn init_tables(conn: sqlight.Connection) {
+  let assert Ok(sql) = simplifile.read("./src/sql/001_setup.sql")
+  io.println("INIT TABLES")
+  let assert Ok(Nil) = sqlight.exec(sql, conn)
+  io.println("INIT COMPLETE")
 }
 
 pub fn main() {
@@ -44,14 +44,16 @@ pub fn main() {
   let tinybird_key = get_env_with_log("TINYBIRD_KEY", "")
   let sqlite_path = get_env_with_log("SQLITE_DB", "")
 
-  let _ = init_db(sqlite_path)
+  use conn <- sqlight.with_connection(sqlite_path)
 
-  let assert Ok(_) =
-    router.handle_request(_, tinybird_key)
-    |> wisp.mist_handler(secret_key_base)
-    |> mist.new
-    |> mist.port(8080)
-    |> mist.start_http
+  init_tables(conn)
+
+  // let assert Ok(_) =
+  //   router.handle_request(_, tinybird_key, conn)
+  //   |> wisp.mist_handler(secret_key_base)
+  //   |> mist.new
+  //   |> mist.port(8080)
+  //   |> mist.start_http
 
   // Start Cron
   // let assert Ok(_) = job.start_sync(hex_key, tinybird_key)

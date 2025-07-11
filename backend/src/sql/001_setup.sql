@@ -1,4 +1,8 @@
 PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+PRAGMA foreign_keys=ON;
+PRAGMA busy_timeout=5000;
+PRAGMA temp_store=MEMORY;
 
 CREATE TABLE IF NOT EXISTS packages (
     package_name TEXT PRIMARY KEY,
