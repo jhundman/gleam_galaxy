@@ -30,7 +30,7 @@ pub fn handle_request(
       |> wisp.json_response(200)
     }
 
-    ["api", ..] -> handle_api_request(req, tb_key)
+    ["api", ..] -> handle_api_request(req, tb_key, conn)
 
     _ -> {
       wisp.response(404)

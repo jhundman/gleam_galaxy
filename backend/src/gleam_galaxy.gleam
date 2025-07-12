@@ -48,12 +48,12 @@ pub fn main() {
 
   init_tables(conn)
 
-  // let assert Ok(_) =
-  //   router.handle_request(_, tinybird_key, conn)
-  //   |> wisp.mist_handler(secret_key_base)
-  //   |> mist.new
-  //   |> mist.port(8080)
-  //   |> mist.start_http
+  let assert Ok(_) =
+    router.handle_request(_, tinybird_key, conn)
+    |> wisp.mist_handler(secret_key_base)
+    |> mist.new
+    |> mist.port(8080)
+    |> mist.start_http
 
   // Start Cron
   // let assert Ok(_) = job.start_sync(hex_key, tinybird_key)

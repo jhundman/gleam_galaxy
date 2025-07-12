@@ -11,16 +11,21 @@ import gleam/otp/task
 import gleam/result
 import gleam_galaxy/api/service
 import gleam_galaxy/error
+import sqlight
 import wisp.{type Request, type Response}
 
-pub fn handle_api_request(req: Request, tb_key: String) -> Response {
+pub fn handle_api_request(
+  req: Request,
+  tb_key: String,
+  conn: sqlight.Connection,
+) -> Response {
   use <- wisp.require_method(req, http.Get)
   case list.drop(wisp.path_segments(req), 1) {
     ["search"] -> search_packages(req, tb_key)
-    ["home"] -> get_home(tb_key)
+    ["home"] -> get_home(conn)
     ["package", pkg] -> get_package(pkg, tb_key)
     [] -> {
-      json.object([#("message", json.string("Hello World"))])
+      json.object([#("message", json.string("Hello API World"))])
       |> json.to_string_builder
       |> wisp.json_response(200)
     }
@@ -57,19 +62,22 @@ fn search_packages(req, tb_key: String) -> Response {
   }
 }
 
-fn get_home(tb_key: String) -> Response {
-  let assert Ok(response) =
-    request.new()
-    |> request.set_host("api.us-east.tinybird.co")
-    |> request.set_path("/v0/pipes/home_summary.json")
-    |> request.prepend_header("Authorization", "Bearer " <> tb_key)
-    |> hackney.send()
+fn get_home(conn: sqlight.Connection) -> Response {
+  let sql =
+    "
+    SELECT
+      COUNT(DISTINCT package_name) AS num_packages,
+      CAST(SUM(downloads_all_time) AS INT) AS total_downloads
+    FROM packages;
+  "
 
-  let assert Ok(home_response) =
-    json.decode(response.body, using: service.decode_home)
-    |> result.map_error(error.JsonDecodeError)
+  let assert Ok(home) =
+    sqlight.query(sql, on: conn, with: [], expecting: service.decode_home)
+    |> io.debug
 
-  service.encode_home(home_response)
+  let assert Ok(home) = home |> list.first()
+
+  service.encode_home(home)
   |> json.to_string_builder()
   |> wisp.json_response(200)
 }
