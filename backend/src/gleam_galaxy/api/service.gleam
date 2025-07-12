@@ -3,6 +3,8 @@ import gleam/dynamic.{type DecodeError, type Dynamic} as dyn
 // import gleam/io
 import gleam/json
 import gleam/list
+import gleam/result
+import gleam/string
 import gleam_galaxy/models.{type Statistics, Meta}
 
 /// Search
@@ -78,21 +80,6 @@ pub type PackageResponse {
     data: List(PackageRecord),
     rows: Int,
     statistics: Statistics,
-  )
-}
-
-pub type PackageRecord {
-  PackageRecord(
-    package_name: String,
-    hex_url: String,
-    description: String,
-    licenses: List(String),
-    repository_url: String,
-    owners: List(String),
-    downloads_all_time: Int,
-    hex_updated_at: String,
-    hex_inserted_at: String,
-    // inserted_at: Time,
   )
 }
 
@@ -185,34 +172,72 @@ pub fn decode_package_history(
   )(data)
 }
 
-pub fn encode_package(pkg: PackageResponse, pkg_history: PackageHistoryResponse) {
-  let recs =
-    list.map(pkg.data, fn(x) {
-      json.object([
-        #("package_name", json.string(x.package_name)),
-        #("hex_url", json.string(x.hex_url)),
-        #("description", json.string(x.description)),
-        #("licenses", json.array(from: x.licenses, of: json.string)),
-        #("repository_url", json.string(x.repository_url)),
-        #("owners", json.array(from: x.owners, of: json.string)),
-        #("downloads_all_time", json.int(x.downloads_all_time)),
-        #("hex_updated_at", json.string(x.hex_updated_at)),
-        #("hex_inserted_at", json.string(x.hex_inserted_at)),
-      ])
-    })
+/// Package Record
+fn string_to_list(data: Dynamic) -> Result(List(String), List(DecodeError)) {
+  use str <- result.try(dyn.string(data))
+  case str {
+    "" -> Ok([])
+    _ -> Ok(string.split(str, ","))
+  }
+}
 
-  let history =
-    list.map(pkg_history.data, fn(x) {
-      json.object([
-        #("package_name", json.string(x.package_name)),
-        #("downloads", json.int(x.downloads)),
-        #("date", json.string(x.date)),
-      ])
-    })
+pub type PackageRecord {
+  PackageRecord(
+    package_name: String,
+    hex_url: String,
+    description: String,
+    licenses: List(String),
+    repository_url: String,
+    owners: List(String),
+    downloads_all_time: Int,
+    hex_updated_at: String,
+    hex_inserted_at: String,
+  )
+}
+
+pub fn decode_package_record(
+  row: Dynamic,
+) -> Result(PackageRecord, List(DecodeError)) {
+  dyn.decode9(
+    PackageRecord,
+    dyn.element(0, dyn.string),
+    dyn.element(1, dyn.string),
+    dyn.element(2, dyn.string),
+    dyn.element(3, string_to_list),
+    dyn.element(4, dyn.string),
+    dyn.element(5, string_to_list),
+    dyn.element(6, dyn.int),
+    dyn.element(7, dyn.string),
+    dyn.element(8, dyn.string),
+  )(row)
+}
+
+// , pkg_history: PackageHistoryResponse
+pub fn encode_package(pkg: PackageRecord) {
+  let recs = [
+    #("package_name", json.string(pkg.package_name)),
+    #("hex_url", json.string(pkg.hex_url)),
+    #("description", json.string(pkg.description)),
+    #("licenses", json.array(from: pkg.licenses, of: json.string)),
+    #("repository_url", json.string(pkg.repository_url)),
+    #("owners", json.array(from: pkg.owners, of: json.string)),
+    #("downloads_all_time", json.int(pkg.downloads_all_time)),
+    #("hex_updated_at", json.string(pkg.hex_updated_at)),
+    #("hex_inserted_at", json.string(pkg.hex_inserted_at)),
+  ]
+
+  // let history =
+  //   list.map(pkg_history.data, fn(x) {
+  //     json.object([
+  //       #("package_name", json.string(x.package_name)),
+  //       #("downloads", json.int(x.downloads)),
+  //       #("date", json.string(x.date)),
+  //     ])
+  //   })
 
   json.object([
-    #("data", json.preprocessed_array(recs)),
-    #("history", json.preprocessed_array(history)),
+    #("data", json.object(recs)),
+    // #("history", json.preprocessed_array(history)),
   ])
 }
 

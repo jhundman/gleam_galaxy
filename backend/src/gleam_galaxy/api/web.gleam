@@ -23,7 +23,7 @@ pub fn handle_api_request(
   case list.drop(wisp.path_segments(req), 1) {
     ["search"] -> search_packages(req, tb_key)
     ["home"] -> get_home(conn)
-    ["package", pkg] -> get_package(pkg, tb_key)
+    ["package", pkg] -> get_package(pkg, conn)
     [] -> {
       json.object([#("message", json.string("Hello API World"))])
       |> json.to_string_builder
@@ -73,41 +73,50 @@ fn get_home(conn: sqlight.Connection) -> Response {
 
   let assert Ok(home) =
     sqlight.query(sql, on: conn, with: [], expecting: service.decode_home)
-    |> io.debug
 
-  let assert Ok(home) = home |> list.first()
+  let assert Ok(home) =
+    home
+    |> list.first()
 
   service.encode_home(home)
   |> json.to_string_builder()
   |> wisp.json_response(200)
 }
 
-fn get_package(pkg: String, tb_key: String) {
-  let package_header = task.async(fn() { get_package_header(pkg, tb_key) })
-  let package_history = task.async(fn() { get_package_history(pkg, tb_key) })
+fn get_package(pkg: String, conn: sqlight.Connection) {
+  let package_header = task.async(fn() { get_package_header(pkg, conn) })
+  // let package_history = task.async(fn() { get_package_history(pkg, conn) })
 
   let package_header = task.await(package_header, 500)
-  let package_history = task.await(package_history, 500)
-
-  service.encode_package(package_header, package_history)
+  // let package_history = task.await(package_history, 500)
+  // package_history
+  service.encode_package(package_header)
   |> json.to_string_builder()
   |> wisp.json_response(200)
 }
 
-fn get_package_header(pkg: String, tb_key: String) {
+fn get_package_header(pkg: String, conn: sqlight.Connection) {
+  let sql =
+    "
+  SELECT
+    *
+  FROM packages
+  WHERE package_name = ?
+  "
+
   let assert Ok(response) =
-    request.new()
-    |> request.set_host("api.us-east.tinybird.co")
-    |> request.set_path("/v0/pipes/get_package.json")
-    |> request.set_query([#("pkg", pkg)])
-    |> request.prepend_header("Authorization", "Bearer " <> tb_key)
-    |> hackney.send()
+    sqlight.query(
+      sql,
+      on: conn,
+      with: [sqlight.text(pkg)],
+      expecting: service.decode_package_record,
+    )
 
-  let assert Ok(pkg_response) =
-    json.decode(response.body, using: service.decode_package)
-    |> result.map_error(error.JsonDecodeError)
+  let assert Ok(response) =
+    response
+    |> list.first()
 
-  pkg_response
+  response
 }
 
 fn get_package_history(pkg: String, tb_key: String) {
