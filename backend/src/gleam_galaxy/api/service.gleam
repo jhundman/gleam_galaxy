@@ -92,10 +92,6 @@ pub type PackageHistoryResponse {
   )
 }
 
-pub type PackageHistory {
-  PackageHistory(package_name: String, downloads: Int, date: String)
-}
-
 pub fn decode_package(
   data: Dynamic,
 ) -> Result(PackageResponse, List(DecodeError)) {
@@ -122,41 +118,6 @@ pub fn decode_package(
         dyn.field("downloads_all_time", dyn.int),
         dyn.field("hex_updated_at", dyn.string),
         dyn.field("hex_inserted_at", dyn.string),
-      )),
-    ),
-    dyn.field("rows", dyn.int),
-    dyn.field(
-      "statistics",
-      dyn.decode3(
-        models.Statistics,
-        dyn.field("elapsed", dyn.float),
-        dyn.field("rows_read", dyn.int),
-        dyn.field("bytes_read", dyn.int),
-      ),
-    ),
-  )(data)
-}
-
-pub fn decode_package_history(
-  data: Dynamic,
-) -> Result(PackageHistoryResponse, List(DecodeError)) {
-  dyn.decode4(
-    PackageHistoryResponse,
-    dyn.field(
-      "meta",
-      dyn.list(dyn.decode2(
-        Meta,
-        dyn.field("name", dyn.string),
-        dyn.field("type", dyn.string),
-      )),
-    ),
-    dyn.field(
-      "data",
-      dyn.list(dyn.decode3(
-        PackageHistory,
-        dyn.field("package_name", dyn.string),
-        dyn.field("downloads", dyn.int),
-        dyn.field("date", dyn.string),
       )),
     ),
     dyn.field("rows", dyn.int),
@@ -212,8 +173,24 @@ pub fn decode_package_record(
   )(row)
 }
 
-// , pkg_history: PackageHistoryResponse
-pub fn encode_package(pkg: PackageRecord) {
+// Package history
+pub type PackageHistory {
+  PackageHistory(package_name: String, downloads: Int, date: String)
+}
+
+pub fn decode_package_history(
+  data: Dynamic,
+) -> Result(PackageHistory, List(DecodeError)) {
+  dyn.decode3(
+    PackageHistory,
+    dyn.element(0, dyn.string),
+    dyn.element(1, dyn.int),
+    dyn.element(2, dyn.string),
+  )(data)
+}
+
+// ,
+pub fn encode_package(pkg: PackageRecord, pkg_history: List(PackageHistory)) {
   let recs = [
     #("package_name", json.string(pkg.package_name)),
     #("hex_url", json.string(pkg.hex_url)),
@@ -226,18 +203,18 @@ pub fn encode_package(pkg: PackageRecord) {
     #("hex_inserted_at", json.string(pkg.hex_inserted_at)),
   ]
 
-  // let history =
-  //   list.map(pkg_history.data, fn(x) {
-  //     json.object([
-  //       #("package_name", json.string(x.package_name)),
-  //       #("downloads", json.int(x.downloads)),
-  //       #("date", json.string(x.date)),
-  //     ])
-  //   })
+  let history =
+    list.map(pkg_history, fn(x) {
+      json.object([
+        #("package_name", json.string(x.package_name)),
+        #("downloads", json.int(x.downloads)),
+        #("date", json.string(x.date)),
+      ])
+    })
 
   json.object([
     #("data", json.object(recs)),
-    // #("history", json.preprocessed_array(history)),
+    #("history", json.preprocessed_array(history)),
   ])
 }
 

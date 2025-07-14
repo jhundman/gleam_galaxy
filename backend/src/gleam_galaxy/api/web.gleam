@@ -85,12 +85,12 @@ fn get_home(conn: sqlight.Connection) -> Response {
 
 fn get_package(pkg: String, conn: sqlight.Connection) {
   let package_header = task.async(fn() { get_package_header(pkg, conn) })
-  // let package_history = task.async(fn() { get_package_history(pkg, conn) })
+  let package_history = task.async(fn() { get_package_history(pkg, conn) })
 
   let package_header = task.await(package_header, 500)
-  // let package_history = task.await(package_history, 500)
-  // package_history
-  service.encode_package(package_header)
+  let package_history = task.await(package_history, 500)
+
+  service.encode_package(package_header, package_history)
   |> json.to_string_builder()
   |> wisp.json_response(200)
 }
@@ -119,19 +119,22 @@ fn get_package_header(pkg: String, conn: sqlight.Connection) {
   response
 }
 
-fn get_package_history(pkg: String, tb_key: String) {
+fn get_package_history(pkg: String, conn: sqlight.Connection) {
+  let sql =
+    "
+    SELECT package_name, downloads_yesterday, date(date, '-1 day') as date
+    FROM package_daily_downloads
+    WHERE package_name = ?
+    "
+
   let assert Ok(response) =
-    request.new()
-    |> request.set_host("api.us-east.tinybird.co")
-    |> request.set_path("/v0/pipes/package_downloads.json")
-    |> request.set_query([#("pkg", pkg)])
-    |> request.prepend_header("Authorization", "Bearer " <> tb_key)
-    |> hackney.send()
+    sqlight.query(
+      sql,
+      on: conn,
+      with: [sqlight.text(pkg)],
+      expecting: service.decode_package_history,
+    )
 
-  let assert Ok(pkg_history_response) =
-    json.decode(response.body, using: service.decode_package_history)
-    |> result.map_error(error.JsonDecodeError)
-
-  pkg_history_response
+  response
 }
 // TODO - Add CSV export endpoint
