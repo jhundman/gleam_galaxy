@@ -1,27 +1,18 @@
-import gleam/hackney
-import gleam/http
-import gleam/http/request
-
 // import gleam/http/response
 // import gleam/int
+import gleam/http
 import gleam/io
 import gleam/json
 import gleam/list
 import gleam/otp/task
-import gleam/result
 import gleam_galaxy/api/service
-import gleam_galaxy/error
 import sqlight
 import wisp.{type Request, type Response}
 
-pub fn handle_api_request(
-  req: Request,
-  tb_key: String,
-  conn: sqlight.Connection,
-) -> Response {
+pub fn handle_api_request(req: Request, conn: sqlight.Connection) -> Response {
   use <- wisp.require_method(req, http.Get)
   case list.drop(wisp.path_segments(req), 1) {
-    ["search"] -> search_packages(req, tb_key)
+    ["search"] -> search_packages(req, conn)
     ["home"] -> get_home(conn)
     ["package", pkg] -> get_package(pkg, conn)
     [] -> {
@@ -35,24 +26,36 @@ pub fn handle_api_request(
   }
 }
 
-fn search_packages(req, tb_key: String) -> Response {
-  io.debug("Here")
+fn search_packages(req, conn: sqlight.Connection) -> Response {
   case wisp.get_query(req) {
     [#("query", q)] -> {
-      let assert Ok(response) =
-        request.new()
-        |> request.set_host("api.us-east.tinybird.co")
-        |> request.set_path("/v0/pipes/package_search.json")
-        |> request.set_query([#("query", q)])
-        |> request.prepend_header("Authorization", "Bearer " <> tb_key)
-        |> hackney.send
-        |> result.map_error(error.HttpClientError)
+      let sql =
+        "
+      SELECT
+          p.package_name,
+          p.description,
+          p.downloads_all_time
+      FROM
+          packages AS p
+      JOIN
+          packages_fts AS fts ON p.rowid = fts.rowid
+      WHERE
+          fts.packages_fts MATCH ?
+      ORDER BY
+          fts.rank,
+          p.downloads_all_time DESC
+      LIMIT 5;
+    "
 
-      let assert Ok(search_response) =
-        json.decode(response.body, using: service.decode_search)
-        |> result.map_error(error.JsonDecodeError)
+      let assert Ok(search) =
+        sqlight.query(
+          sql,
+          on: conn,
+          with: [sqlight.text(q)],
+          expecting: service.decode_search,
+        )
 
-      service.encode_search(search_response)
+      service.encode_search(search)
       |> json.to_string_builder()
       |> wisp.json_response(200)
     }

@@ -49,7 +49,7 @@ pub fn main() {
   init_tables(conn)
 
   let assert Ok(_) =
-    router.handle_request(_, tinybird_key, conn)
+    router.handle_request(_, conn)
     |> wisp.mist_handler(secret_key_base)
     |> mist.new
     |> mist.port(8080)

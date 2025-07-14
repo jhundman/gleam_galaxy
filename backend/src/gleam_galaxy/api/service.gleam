@@ -26,43 +26,18 @@ pub type SearchRecord {
   )
 }
 
-pub fn decode_search(data: Dynamic) -> Result(SearchResponse, List(DecodeError)) {
-  dyn.decode5(
-    SearchResponse,
-    dyn.field(
-      "meta",
-      dyn.list(dyn.decode2(
-        Meta,
-        dyn.field("name", dyn.string),
-        dyn.field("type", dyn.string),
-      )),
-    ),
-    dyn.field(
-      "data",
-      dyn.list(dyn.decode3(
-        SearchRecord,
-        dyn.field("package_name", dyn.string),
-        dyn.field("description", dyn.string),
-        dyn.field("downloads_all_time", dyn.int),
-      )),
-    ),
-    dyn.field("rows", dyn.int),
-    dyn.field("rows_before_limit_at_least", dyn.int),
-    dyn.field(
-      "statistics",
-      dyn.decode3(
-        models.Statistics,
-        dyn.field("elapsed", dyn.float),
-        dyn.field("rows_read", dyn.int),
-        dyn.field("bytes_read", dyn.int),
-      ),
-    ),
+pub fn decode_search(data: Dynamic) -> Result(SearchRecord, List(DecodeError)) {
+  dyn.decode3(
+    SearchRecord,
+    dyn.field(0, dyn.string),
+    dyn.field(1, dyn.string),
+    dyn.field(2, dyn.int),
   )(data)
 }
 
-pub fn encode_search(search: SearchResponse) {
+pub fn encode_search(search: List(SearchRecord)) {
   let recs =
-    list.map(search.data, fn(x) {
+    list.map(search, fn(x) {
       json.object([
         #("package_name", json.string(x.package_name)),
         #("description", json.string(x.description)),
