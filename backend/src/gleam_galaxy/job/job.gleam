@@ -107,7 +107,7 @@ pub fn get_max_package_updated_at(conn: sqlight.Connection) {
 fn sync_updates(state: State) {
   use packages <- result.try(fetch_packages(state))
   // TESTING: Limit to first 3 packages to avoid hitting API too much
-  let packages = list.take(packages, 40)
+  let packages = list.take(packages, 1)
   io.println("LIST LENGTH:" <> int.to_string(list.length(packages)))
 
   use min_date <- result.try(min_timestamp(packages))
@@ -404,7 +404,7 @@ fn sync_downloads(state: State) {
   let packages = case get_list_gleam_packages_sqlite(state.db_connection) {
     Ok(packages) -> {
       // TESTING: Limit to first 5 packages to avoid hitting API too much
-      let limited_packages = list.take(packages, 5)
+      let limited_packages = list.take(packages, 1)
       {
         int.to_string(list.length(limited_packages))
         <> " Packages to Get Downloads"

@@ -30,20 +30,18 @@ fn search_packages(req, conn: sqlight.Connection) -> Response {
     [#("query", q)] -> {
       let sql =
         "
-      SELECT
+        SELECT
           p.package_name,
           p.description,
           p.downloads_all_time
-      FROM
-          packages AS p
-      JOIN
-          packages_fts AS fts ON p.rowid = fts.rowid
-      WHERE
-          fts.packages_fts MATCH ?
-      ORDER BY
-          fts.rank,
-          p.downloads_all_time DESC
-      LIMIT 5;
+        FROM packages AS p
+        JOIN packages_fts AS fts
+        ON p.rowid = fts.rowid
+        WHERE
+          fts.packages_fts MATCH ? || '*'
+        ORDER BY
+          (fts.rank * log2(2 + p.downloads_all_time))
+        LIMIT 5;
     "
 
       let assert Ok(search) =
@@ -127,6 +125,7 @@ fn get_package_history(pkg: String, conn: sqlight.Connection) {
     SELECT package_name, downloads_yesterday, date(date, '-1 day') as date
     FROM package_daily_downloads
     WHERE package_name = ?
+    ORDER BY date DESC
     "
 
   let assert Ok(response) =

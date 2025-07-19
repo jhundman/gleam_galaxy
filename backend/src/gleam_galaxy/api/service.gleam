@@ -27,9 +27,9 @@ pub type SearchRecord {
 pub fn decode_search(data: Dynamic) -> Result(SearchRecord, List(DecodeError)) {
   dyn.decode3(
     SearchRecord,
-    dyn.field(0, dyn.string),
-    dyn.field(1, dyn.string),
-    dyn.field(2, dyn.int),
+    dyn.element(0, dyn.string),
+    dyn.element(1, dyn.string),
+    dyn.element(2, dyn.int),
   )(data)
 }
 
