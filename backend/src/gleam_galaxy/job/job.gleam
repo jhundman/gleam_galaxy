@@ -1,7 +1,7 @@
 import birl.{type Time}
 import birl/duration
 import gleam/dict
-import gleam/dynamic.{type DecodeError, type Dynamic} as dyn
+import gleam/dynamic as dyn
 import gleam/erlang/process
 import gleam/hackney
 import gleam/hexpm.{type Package}
@@ -63,10 +63,11 @@ fn sync_data(state: State) -> Nil {
 
   let state = models.State(..state, last_updated_at: last_updated_at)
   wisp.log_info("Start Cron Job at: " <> state.current_time |> birl.to_iso8601)
+  wisp.log_info("Max Updated At: " <> state.last_updated_at |> birl.to_iso8601)
 
-  // // Sync Updates
-  // wisp.log_info("===== Sync Updates =====")
-  // let _ = sync_updates(state)
+  // Sync Updates
+  wisp.log_info("===== Sync Updates =====")
+  let _ = sync_updates(state)
 
   // // Sync Downloads
   // wisp.log_info("===== Sync Downloads =====")
@@ -108,340 +109,301 @@ pub fn get_max_package_updated_at(conn: sqlight.Connection) {
   |> birl.subtract(duration.hours(12))
   |> Ok()
 }
-// /// Sync Package Updates ==========================================================================
-// fn sync_updates(state: State) {
-//   use packages <- result.try(fetch_packages(state))
-//   io.println("LIST LENGTH:" <> int.to_string(list.length(packages)))
 
-//   use min_date <- result.try(min_timestamp(packages))
-//   let start = birl.utc_now()
+/// Sync Package Updates ==========================================================================
+fn sync_updates(state: State) {
+  use packages <- result.try(fetch_packages(state))
+  // TESTING: Limit to first 3 packages to avoid hitting API too much
+  let packages = list.take(packages, 40)
+  io.println("LIST LENGTH:" <> int.to_string(list.length(packages)))
 
-//   // 100 / chunk size = num_tasks
-//   let chunks = list.sized_chunk(packages, 100)
-//   // io.println("Chunk LENGTH:" <> int.to_string(list.length(chunks)))
+  use min_date <- result.try(min_timestamp(packages))
+  let start = birl.utc_now()
 
-//   let handles =
-//     list.map(chunks, fn(chunk) {
-//       task.async(fn() {
-//         list.map(chunk, fn(pkg) {
-//           process.sleep(1000)
-//           process_package(pkg, state)
-//         })
-//       })
-//     })
+  // 100 / chunk size = num_tasks
+  let chunks = list.sized_chunk(packages, 100)
+  // io.println("Chunk LENGTH:" <> int.to_string(list.length(chunks)))
 
-//   let pkgs =
-//     list.fold(handles, [], fn(acc, handle) {
-//       let result = task.await(handle, 600_000)
-//       list.concat([result, acc])
-//     })
+  let handles =
+    list.map(chunks, fn(chunk) {
+      task.async(fn() {
+        list.map(chunk, fn(pkg) {
+          process.sleep(1000)
+          process_package(pkg, state)
+        })
+      })
+    })
 
-//   io.println("pkgs LENGTH:" <> int.to_string(list.length(pkgs)))
+  let pkgs =
+    list.fold(handles, [], fn(acc, handle) {
+      let result = task.await(handle, 600_000)
+      list.concat([result, acc])
+    })
 
-//   // io.debug(list.length(pkgs))
-//   io.println(
-//     "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
-//   )
-//   process.sleep(30_000)
+  io.println("pkgs LENGTH:" <> int.to_string(list.length(pkgs)))
 
-//   // If min package updated at greater than or equal to max tb date
-//   // then keep looping as have not seen all packages
-//   let _ = case birl.compare(min_date, state.last_updated_at) {
-//     Gt | Eq -> {
-//       io.println(
-//         "Gt Eq"
-//         <> " Packages Date"
-//         <> birl.to_iso8601(min_date)
-//         <> " Min Date TB: "
-//         <> birl.to_iso8601(state.last_updated_at),
-//       )
-//       sync_updates(models.State(..state, page: state.page + 1))
-//     }
-//     Lt -> {
-//       io.println(
-//         "LT"
-//         <> " Packages Date"
-//         <> birl.to_iso8601(min_date)
-//         <> " Min Date TB: "
-//         <> birl.to_iso8601(state.last_updated_at),
-//       )
-//       Ok(Nil)
-//     }
-//   }
+  // io.debug(list.length(pkgs))
+  io.println(
+    "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
+  )
+  process.sleep(30_000)
 
-//   Ok(Nil)
-// }
+  // If min package updated at greater than or equal to max tb date
+  // then keep looping as have not seen all packages
+  let _ = case birl.compare(min_date, state.last_updated_at) {
+    Gt | Eq -> {
+      io.println(
+        "Gt Eq"
+        <> " Packages Date"
+        <> birl.to_iso8601(min_date)
+        <> " Min Date TB: "
+        <> birl.to_iso8601(state.last_updated_at),
+      )
+      sync_updates(models.State(..state, page: state.page + 1))
+    }
+    Lt -> {
+      io.println(
+        "LT"
+        <> " Packages Date"
+        <> birl.to_iso8601(min_date)
+        <> " Min Date TB: "
+        <> birl.to_iso8601(state.last_updated_at),
+      )
+      Ok(Nil)
+    }
+  }
 
-// fn min_timestamp(packages: List(hexpm.Package)) -> Result(Time, Error) {
-//   // Assume the packages are sorted desc
-//   let assert Ok(first) = list.first(packages)
-//   let assert Ok(last) = list.last(packages)
-//   case birl.compare(first.updated_at, last.updated_at) {
-//     Gt | Eq -> Nil
-//     Lt -> panic as "PACKAGES NOT SORTED CORRECTLY"
-//   }
+  Ok(Nil)
+}
 
-//   case list.last(packages) {
-//     Ok(last) -> last.updated_at
-//     Error(_) -> birl.from_unix(0)
-//   }
-//   |> Ok()
-// }
+fn min_timestamp(packages: List(hexpm.Package)) -> Result(Time, Error) {
+  // Assume the packages are sorted desc
+  let assert Ok(first) = list.first(packages)
+  let assert Ok(last) = list.last(packages)
+  case birl.compare(first.updated_at, last.updated_at) {
+    Gt | Eq -> Nil
+    Lt -> panic as "PACKAGES NOT SORTED CORRECTLY"
+  }
 
-// fn fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
-//   io.println("Page: " <> int.to_string(state.page))
-//   use response <- result.try(
-//     request.new()
-//     |> request.set_host("hex.pm")
-//     |> request.set_path("/api/packages")
-//     |> request.set_query([
-//       #("sort", "updated_at"),
-//       #("page", int.to_string(state.page)),
-//     ])
-//     |> request.prepend_header("authorization", state.hex_key)
-//     |> hackney.send
-//     |> result.map_error(error.HttpClientError),
-//   )
-//   use all_packages <- result.try(
-//     json.decode(response.body, using: dyn.list(of: hexpm.decode_package))
-//     |> result.map_error(error.JsonDecodeError),
-//   )
-//   Ok(all_packages)
-// }
+  case list.last(packages) {
+    Ok(last) -> last.updated_at
+    Error(_) -> birl.from_unix(0)
+  }
+  |> Ok()
+}
 
-// fn process_package(package: hexpm.Package, state: State) {
-//   use releases <- result.try(lookup_gleam_releases(package, state.hex_key))
-//   case releases {
-//     [] -> {
-//       io.println(package.name <> " - NO GLEAM RELEASES")
-//       Ok(state)
-//     }
-//     _ -> {
-//       io.println("UPDATE - " <> package.name)
-//       let _ = insert_updates(package, releases, state)
-//       Ok(state)
-//     }
-//   }
-// }
+fn fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
+  io.println("Page: " <> int.to_string(state.page))
+  use response <- result.try(
+    request.new()
+    |> request.set_host("hex.pm")
+    |> request.set_path("/api/packages")
+    |> request.set_query([
+      #("sort", "updated_at"),
+      #("page", int.to_string(state.page)),
+    ])
+    |> request.prepend_header("authorization", state.hex_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
+  use all_packages <- result.try(
+    json.decode(response.body, using: dyn.list(of: hexpm.decode_package))
+    |> result.map_error(error.JsonDecodeError),
+  )
+  Ok(all_packages)
+}
 
-// fn insert_updates(
-//   package: hexpm.Package,
-//   releases: List(hexpm.Release),
-//   state: State,
-// ) {
-//   // io.println("CREATE JSON")
-//   let _ =
-//     create_package_json(package)
-//     |> insert_data_tb(state.tinybird_key, "packages")
+fn process_package(package: hexpm.Package, state: State) {
+  use releases <- result.try(lookup_gleam_releases(package, state.hex_key))
+  case releases {
+    [] -> {
+      io.println(package.name <> " - NO GLEAM RELEASES")
+      Ok(state)
+    }
+    _ -> {
+      io.println("UPDATE - " <> package.name)
+      let _ = insert_updates(package, releases, state)
+      Ok(state)
+    }
+  }
+}
 
-//   // io.println("CREATE RELEASES")
-//   create_release_json(package.name, releases)
-//   |> insert_data_tb(state.tinybird_key, "package_releases")
-// }
+fn insert_updates(
+  package: hexpm.Package,
+  releases: List(hexpm.Release),
+  state: State,
+) {
+  let _ = insert_package_sqlite(package, state.db_connection)
+  let _ = insert_releases_sqlite(package.name, releases, state.db_connection)
+  Ok(Nil)
+}
 
-// fn lookup_gleam_releases(
-//   package: hexpm.Package,
-//   hex_key: String,
-// ) -> Result(List(hexpm.Release), Error) {
-//   use releases <- result.try(
-//     list.try_map(package.releases, lookup_release(_, hex_key)),
-//   )
-//   releases
-//   |> list.filter(fn(release) {
-//     list.contains(release.meta.build_tools, "gleam")
-//   })
-//   |> Ok
-// }
+fn lookup_gleam_releases(
+  package: hexpm.Package,
+  hex_key: String,
+) -> Result(List(hexpm.Release), Error) {
+  use releases <- result.try(
+    list.try_map(package.releases, lookup_release(_, hex_key)),
+  )
+  releases
+  |> list.filter(fn(release) {
+    list.contains(release.meta.build_tools, "gleam")
+  })
+  |> Ok
+}
 
-// fn lookup_release(
-//   release: hexpm.PackageRelease,
-//   hex_key: String,
-// ) -> Result(hexpm.Release, Error) {
-//   let assert Ok(url) = uri.parse(release.url)
+fn lookup_release(
+  release: hexpm.PackageRelease,
+  hex_key: String,
+) -> Result(hexpm.Release, Error) {
+  let assert Ok(url) = uri.parse(release.url)
 
-//   use response <- result.try(
-//     request.new()
-//     |> request.set_host("hex.pm")
-//     |> request.set_path(url.path)
-//     |> request.prepend_header("authorization", hex_key)
-//     |> hackney.send
-//     |> result.map_error(error.HttpClientError),
-//   )
+  use response <- result.try(
+    request.new()
+    |> request.set_host("hex.pm")
+    |> request.set_path(url.path)
+    |> request.prepend_header("authorization", hex_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
 
-//   case response.status > 299 {
-//     True ->
-//       io.print_error(
-//         "RELEASE REQUEST: "
-//         <> url.path
-//         <> " "
-//         <> release.version
-//         <> " "
-//         <> int.to_string(response.status)
-//         <> response.body,
-//       )
-//     _ -> Nil
-//   }
+  case response.status > 299 {
+    True ->
+      io.print_error(
+        "RELEASE REQUEST: "
+        <> url.path
+        <> " "
+        <> release.version
+        <> " "
+        <> int.to_string(response.status)
+        <> response.body,
+      )
+    _ -> Nil
+  }
 
-//   json.decode(response.body, using: hexpm.decode_release)
-//   |> result.map_error(error.JsonDecodeError)
-// }
+  json.decode(response.body, using: hexpm.decode_release)
+  |> result.map_error(error.JsonDecodeError)
+}
 
-// pub fn create_download_json(pkg: Package) {
-//   let downloads =
-//     pkg.downloads
-//     |> dict.get("day")
-//     |> result.unwrap(0)
-//     |> json.int()
+fn insert_package_sqlite(pkg: hexpm.Package, conn: sqlight.Connection) {
+  let downloads =
+    pkg.downloads
+    |> dict.get("all")
+    |> result.unwrap(0)
 
-//   let date =
-//     birl.utc_now()
-//     |> birl.to_naive_date_string()
-//     |> json.string()
+  let repo_url =
+    pkg.meta.links
+    |> dict.get("Repository")
+    |> result.unwrap("")
 
-//   let inserted_at =
-//     birl.utc_now()
-//     |> birl.to_iso8601()
-//     |> json.string()
+  let hex_updated_at = pkg.updated_at |> birl.to_iso8601()
+  let hex_inserted_at = pkg.inserted_at |> birl.to_iso8601()
+  let inserted_at = birl.utc_now() |> birl.to_iso8601()
+  let licenses_json =
+    json.array(pkg.meta.licenses, of: json.string) |> json.to_string()
 
-//   let x = {
-//     json.object([
-//       #("package_name", json.string(pkg.name)),
-//       #("downloads_yesterday", downloads),
-//       #("date", date),
-//       #("inserted_at", inserted_at),
-//     ])
-//   }
-//   json.to_string(x)
-// }
+  let sql =
+    "
+    INSERT OR REPLACE INTO packages (
+      package_name, hex_url, description, licenses, repository_url,
+      downloads_all_time, hex_updated_at, hex_inserted_at, inserted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  "
 
-// pub fn create_package_json(pkg: Package) {
-//   let downloads =
-//     pkg.downloads
-//     |> dict.get("all")
-//     |> result.unwrap(0)
-//     |> json.int()
+  sqlight.query(
+    sql,
+    on: conn,
+    with: [
+      sqlight.text(pkg.name),
+      sqlight.text(option.unwrap(pkg.html_url, "")),
+      sqlight.text(option.unwrap(pkg.meta.description, "")),
+      sqlight.text(licenses_json),
+      sqlight.text(repo_url),
+      sqlight.int(downloads),
+      sqlight.text(hex_updated_at),
+      sqlight.text(hex_inserted_at),
+      sqlight.text(inserted_at),
+    ],
+    expecting: dyn.dynamic,
+  )
+  |> result.map(fn(_) { Nil })
+  |> result.unwrap(Nil)
+}
 
-//   let repo_url =
-//     pkg.meta.links
-//     |> dict.get("Repository")
-//     |> result.unwrap("")
-//     |> json.string()
+fn insert_releases_sqlite(
+  package_name: String,
+  releases: List(hexpm.Release),
+  conn: sqlight.Connection,
+) {
+  list.each(releases, fn(release) {
+    insert_release_sqlite(package_name, release, conn)
+  })
+}
 
-//   let hex_updated_at =
-//     pkg.updated_at
-//     |> birl.to_iso8601()
-//     |> json.string()
+fn insert_release_sqlite(
+  package_name: String,
+  release: hexpm.Release,
+  conn: sqlight.Connection,
+) {
+  let hex_updated_at = release.updated_at |> birl.to_iso8601()
+  let hex_inserted_at = release.inserted_at |> birl.to_iso8601()
+  let inserted_at = birl.utc_now() |> birl.to_iso8601()
 
-//   let hex_inserted_at =
-//     pkg.inserted_at
-//     |> birl.to_iso8601()
-//     |> json.string()
+  let sql =
+    "
+    INSERT OR REPLACE INTO package_releases (
+      package_name, release, release_downloads, url,
+      hex_updated_at, hex_inserted_at, inserted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  "
 
-//   let inserted_at =
-//     birl.utc_now()
-//     |> birl.to_iso8601()
-//     |> json.string()
+  sqlight.query(
+    sql,
+    on: conn,
+    with: [
+      sqlight.text(package_name),
+      sqlight.text(release.version),
+      sqlight.int(release.downloads),
+      sqlight.text(release.url),
+      sqlight.text(hex_updated_at),
+      sqlight.text(hex_inserted_at),
+      sqlight.text(inserted_at),
+    ],
+    expecting: dyn.dynamic,
+  )
+  |> result.map(fn(_) { Nil })
+  |> result.unwrap(Nil)
+}
 
-//   let x = {
-//     json.object([
-//       #("package_name", json.string(pkg.name)),
-//       #("hex_url", json.string(option.unwrap(pkg.html_url, ""))),
-//       #("description", json.string(option.unwrap(pkg.meta.description, ""))),
-//       #("licenses", json.array(pkg.meta.licenses, of: json.string)),
-//       #("repository_url", repo_url),
-//       #("owners", json.array([], of: json.string)),
-//       #("downloads_all_time", downloads),
-//       #("hex_updated_at", hex_updated_at),
-//       #("hex_inserted_at", hex_inserted_at),
-//       #("inserted_at", inserted_at),
-//     ])
-//   }
-//   json.to_string(x)
-// }
+pub fn fetch_package(package_name: String, hex_key: String) {
+  use response <- result.try(
+    request.new()
+    |> request.set_host("hex.pm")
+    |> request.set_path("/api/packages/" <> package_name)
+    |> request.prepend_header("authorization", hex_key)
+    |> hackney.send
+    |> result.map_error(error.HttpClientError),
+  )
 
-// // Map over all releases, and create a ndjson string to be inserted which contains all releases
-// fn create_release_json(package_name: String, releases: List(hexpm.Release)) {
-//   list.fold(releases, "", fn(b, a) {
-//     b <> "\n" <> release_to_json(package_name, a)
-//   })
-// }
+  case response.status > 299 {
+    True ->
+      io.print_error(
+        "Package REQUEST: "
+        <> package_name
+        <> " "
+        <> int.to_string(response.status)
+        <> response.body,
+      )
+    _ -> Nil
+  }
 
-// fn release_to_json(package_name: String, release: hexpm.Release) {
-//   let hex_updated_at =
-//     release.updated_at
-//     |> birl.to_iso8601()
-//     |> json.string()
+  use package <- result.try(
+    json.decode(response.body, using: hexpm.decode_package)
+    |> result.map_error(error.JsonDecodeError),
+  )
 
-//   let hex_inserted_at =
-//     release.inserted_at
-//     |> birl.to_iso8601()
-//     |> json.string()
-
-//   let inserted_at =
-//     birl.utc_now()
-//     |> birl.to_iso8601()
-//     |> json.string()
-
-//   let x = {
-//     json.object([
-//       #("package_name", json.string(package_name)),
-//       #("release", json.string(release.version)),
-//       #("release_downloads", json.int(release.downloads)),
-//       #("url", json.string(release.url)),
-//       #("hex_updated_at", hex_updated_at),
-//       #("hex_inserted_at", hex_inserted_at),
-//       #("inserted_at", inserted_at),
-//     ])
-//   }
-//   json.to_string(x)
-// }
-
-// pub fn fetch_package(package_name: String, hex_key: String) {
-//   use response <- result.try(
-//     request.new()
-//     |> request.set_host("hex.pm")
-//     |> request.set_path("/api/packages/" <> package_name)
-//     |> request.prepend_header("authorization", hex_key)
-//     |> hackney.send
-//     |> result.map_error(error.HttpClientError),
-//   )
-
-//   case response.status > 299 {
-//     True ->
-//       io.print_error(
-//         "Package REQUEST: "
-//         <> package_name
-//         <> " "
-//         <> int.to_string(response.status)
-//         <> response.body,
-//       )
-//     _ -> Nil
-//   }
-
-//   use package <- result.try(
-//     json.decode(response.body, using: hexpm.decode_package)
-//     |> result.map_error(error.JsonDecodeError),
-//   )
-
-//   Ok(package)
-// }
-
-// // Insert Package
-
-// fn insert_data_tb(body: String, tinybird_key: String, table_name: String) {
-//   let _ =
-//     request.new()
-//     |> request.set_method(http.Post)
-//     |> request.set_host("api.us-east.tinybird.co")
-//     |> request.set_path("/v0/events")
-//     |> request.prepend_header("Authorization", "Bearer " <> tinybird_key)
-//     |> request.set_query([#("name", table_name)])
-//     |> request.set_body(body)
-//     |> hackney.send
-//     |> result.map_error(error.HttpClientError)
-//   Ok(Nil)
-// }
-
+  Ok(package)
+}
 // // Sync Downloads =======================================================================
 
 // fn sync_downloads(state: State) {
