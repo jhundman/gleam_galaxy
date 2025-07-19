@@ -1,6 +1,4 @@
 import gleam/dynamic.{type DecodeError, type Dynamic} as dyn
-
-// import gleam/io
 import gleam/json
 import gleam/list
 import gleam/result

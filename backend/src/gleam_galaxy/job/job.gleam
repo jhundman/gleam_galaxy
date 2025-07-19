@@ -4,8 +4,7 @@ import gleam/dict
 import gleam/dynamic as dyn
 import gleam/erlang/process
 import gleam/hackney
-import gleam/hexpm.{type Package}
-import gleam/http
+import gleam/hexpm
 import gleam/http/request
 import gleam/int
 import gleam/io
@@ -15,18 +14,12 @@ import gleam/option
 import gleam/order.{Eq, Gt, Lt}
 import gleam/otp/task
 import gleam/result
-import gleam/string
 import gleam/uri
 import gleam_galaxy/error.{type Error}
-import gleam_galaxy/job/job_models
 import gleam_galaxy/models.{type State}
-import sqlight
-
-// import pprint as pp
 import shakespeare/actors/periodic.{Ms, start}
+import sqlight
 import wisp
-
-// TODO change it from cron process to cron API call. Make API in web
 
 /// Start Cron Job to Sync Hex Packages
 pub fn start_sync(hex_key: String, conn: sqlight.Connection) {
@@ -69,9 +62,9 @@ fn sync_data(state: State) -> Nil {
   wisp.log_info("===== Sync Updates =====")
   let _ = sync_updates(state)
 
-  // // Sync Downloads
-  // wisp.log_info("===== Sync Downloads =====")
-  // let _ = sync_downloads(state)
+  // Sync Downloads
+  wisp.log_info("===== Sync Downloads =====")
+  let _ = sync_downloads(state)
 
   wisp.log_info(
     "Cron Job Completed at: " <> state.current_time |> birl.to_iso8601,
@@ -404,94 +397,113 @@ pub fn fetch_package(package_name: String, hex_key: String) {
 
   Ok(package)
 }
-// // Sync Downloads =======================================================================
 
-// fn sync_downloads(state: State) {
-//   let packages = case get_list_gleam_packages(state) {
-//     Ok(packages) -> {
-//       { int.to_string(list.length(packages)) <> " Packages to Get Downloads" }
-//       |> io.println()
-//       packages
-//     }
-//     Error(_) -> []
-//   }
+// Sync Downloads =======================================================================
 
-//   let start = birl.utc_now()
+fn sync_downloads(state: State) {
+  let packages = case get_list_gleam_packages_sqlite(state.db_connection) {
+    Ok(packages) -> {
+      // TESTING: Limit to first 5 packages to avoid hitting API too much
+      let limited_packages = list.take(packages, 5)
+      {
+        int.to_string(list.length(limited_packages))
+        <> " Packages to Get Downloads"
+      }
+      |> io.println()
+      limited_packages
+    }
+    Error(_) -> []
+  }
 
-//   let chunk_size = list.length(packages) / 1
-//   let chunks = list.sized_chunk(packages, chunk_size)
+  let start = birl.utc_now()
 
-//   let handles =
-//     list.map(chunks, fn(chunk) {
-//       task.async(fn() {
-//         list.map(chunk, fn(pkg) {
-//           process.sleep(1000)
-//           io.println("Getting downloads - " <> pkg)
-//           fetch_package(pkg, state.hex_key)
-//         })
-//       })
-//     })
+  let chunk_size = list.length(packages) / 1
+  let chunks = list.sized_chunk(packages, chunk_size)
 
-//   let _ =
-//     list.fold(handles, [], fn(acc, handle) {
-//       let result = task.await(handle, 3_600_000)
-//       list.concat([result, acc])
-//     })
-//     |> list.fold("", fn(b, a) { b <> create_package_downloads(a) })
-//     |> insert_data_tb(state.tinybird_key, "package_daily_downloads")
+  let handles =
+    list.map(chunks, fn(chunk) {
+      task.async(fn() {
+        list.map(chunk, fn(pkg) {
+          process.sleep(1000)
+          io.println("Getting downloads - " <> pkg)
+          fetch_package(pkg, state.hex_key)
+        })
+      })
+    })
 
-//   io.println(
-//     "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
-//   )
-// }
+  let download_results =
+    list.fold(handles, [], fn(acc, handle) {
+      let result = task.await(handle, 3_600_000)
+      list.concat([result, acc])
+    })
 
-// fn get_list_gleam_packages(state: State) {
-//   use response <- result.try(
-//     request.new()
-//     |> request.set_host("api.us-east.tinybird.co")
-//     |> request.set_path("/v0/pipes/list_of_packages.csv")
-//     |> request.prepend_header("Authorization", "Bearer " <> state.tinybird_key)
-//     |> hackney.send
-//     |> result.map_error(error.HttpClientError),
-//   )
+  let _ =
+    list.each(download_results, fn(result) {
+      insert_package_daily_downloads_sqlite(result, state.db_connection)
+    })
 
-//   let packages =
-//     response.body
-//     |> string.split("\n")
-//     |> list.map(fn(x) { string.replace(in: x, each: "\"", with: "") })
-//     |> list.filter(fn(x) { string.length(x) > 0 })
+  io.println(
+    "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
+  )
+}
 
-//   Ok(packages)
-// }
+fn get_list_gleam_packages_sqlite(conn: sqlight.Connection) {
+  let sql =
+    "SELECT DISTINCT package_name FROM packages ORDER BY downloads_all_time DESC"
 
-// fn create_package_downloads(package: Result(hexpm.Package, Error)) {
-//   case package {
-//     Ok(package) -> {
-//       let downloads =
-//         package.downloads
-//         |> dict.get("day")
-//         |> result.unwrap(0)
+  use packages <- result.try(
+    sqlight.query(
+      sql,
+      on: conn,
+      with: [],
+      expecting: dyn.element(0, dyn.string),
+    )
+    |> result.map_error(error.DatabaseError),
+  )
 
-//       let date =
-//         birl.utc_now()
-//         |> birl.to_naive_date_string()
-//         |> json.string()
+  Ok(packages)
+}
 
-//       let inserted_at =
-//         birl.utc_now()
-//         |> birl.to_iso8601()
-//         |> json.string()
+fn insert_package_daily_downloads_sqlite(
+  package_result: Result(hexpm.Package, Error),
+  conn: sqlight.Connection,
+) {
+  case package_result {
+    Ok(package) -> {
+      let downloads_yesterday =
+        package.downloads
+        |> dict.get("day")
+        |> result.unwrap(0)
 
-//       let x = {
-//         json.object([
-//           #("package_name", json.string(package.name)),
-//           #("date", date),
-//           #("downloads_yesterday", json.int(downloads)),
-//           #("inserted_at", inserted_at),
-//         ])
-//       }
-//       json.to_string(x) <> "\n"
-//     }
-//     Error(_) -> ""
-//   }
-// }
+      let date =
+        birl.utc_now()
+        |> birl.to_naive_date_string()
+
+      let inserted_at =
+        birl.utc_now()
+        |> birl.to_iso8601()
+
+      let sql =
+        "
+        INSERT OR REPLACE INTO package_daily_downloads (
+          package_name, date, downloads_yesterday, inserted_at
+        ) VALUES (?, ?, ?, ?)
+        "
+
+      sqlight.query(
+        sql,
+        on: conn,
+        with: [
+          sqlight.text(package.name),
+          sqlight.text(date),
+          sqlight.int(downloads_yesterday),
+          sqlight.text(inserted_at),
+        ],
+        expecting: dyn.dynamic,
+      )
+      |> result.map(fn(_) { Nil })
+      |> result.unwrap(Nil)
+    }
+    Error(_) -> Nil
+  }
+}

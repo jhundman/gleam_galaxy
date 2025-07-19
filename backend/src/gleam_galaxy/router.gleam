@@ -1,4 +1,3 @@
-// import gleam/io
 import gleam/json
 import gleam_galaxy/api/web.{handle_api_request}
 import sqlight

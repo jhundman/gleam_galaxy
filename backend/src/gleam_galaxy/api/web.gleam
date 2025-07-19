@@ -1,7 +1,6 @@
 // import gleam/http/response
 // import gleam/int
 import gleam/http
-import gleam/io
 import gleam/json
 import gleam/list
 import gleam/otp/task
