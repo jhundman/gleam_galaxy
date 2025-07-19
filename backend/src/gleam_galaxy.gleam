@@ -41,7 +41,6 @@ pub fn main() {
   let _ = dotenv.load()
 
   let hex_key = get_env_with_log("HEX_API_KEY", "")
-  let tinybird_key = get_env_with_log("TINYBIRD_KEY", "")
   let sqlite_path = get_env_with_log("SQLITE_DB", "")
 
   use conn <- sqlight.with_connection(sqlite_path)
@@ -56,7 +55,7 @@ pub fn main() {
     |> mist.start_http
 
   // Start Cron
-  // let assert Ok(_) = job.start_sync(hex_key, tinybird_key)
+  let assert Ok(_) = job.start_sync(hex_key, conn)
 
   process.sleep_forever()
 }
