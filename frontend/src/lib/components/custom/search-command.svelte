@@ -124,6 +124,16 @@
 				{/each}
 			</Command.Group>
 		{/if}
+		{#if searchTerm.length > 0 && !searchResults.some((pkg) => pkg.package_name.toLowerCase() === searchTerm.toLowerCase())}
+			<Command.Group heading="Manual Search">
+				<a tabindex="-1" href={`/${searchTerm}`} on:mouseup={close_dialog}>
+					<Command.Item class="hover:cursor-pointer" value={searchTerm}>
+						Search for "{searchTerm}"
+						<div class="absoluteright-0 ml-auto flex justify-center text-sm opacity-50"></div>
+					</Command.Item>
+				</a>
+			</Command.Group>
+		{/if}
 		<Command.Group heading="Home">
 			<a tabindex="-1" href="/" on:mouseup={close_dialog}>
 				<Command.Item class="hover:cursor-pointer">Home</Command.Item>

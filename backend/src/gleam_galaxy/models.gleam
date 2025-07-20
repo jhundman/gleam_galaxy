@@ -1,4 +1,5 @@
 import birl.{type Time}
+import sqlight
 
 // Service State
 pub type State {
@@ -6,7 +7,7 @@ pub type State {
     page: Int,
     last_updated_at: Time,
     hex_key: String,
-    tinybird_key: String,
+    db_connection: sqlight.Connection,
     current_time: Time,
   )
 }

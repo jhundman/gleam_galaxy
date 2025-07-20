@@ -1,9 +1,8 @@
-import birl
 import gleam/dynamic.{type DecodeError, type Dynamic} as dyn
-
-// import gleam/io
 import gleam/json
 import gleam/list
+import gleam/result
+import gleam/string
 import gleam_galaxy/models.{type Statistics, Meta}
 
 /// Search
@@ -25,43 +24,18 @@ pub type SearchRecord {
   )
 }
 
-pub fn decode_search(data: Dynamic) -> Result(SearchResponse, List(DecodeError)) {
-  dyn.decode5(
-    SearchResponse,
-    dyn.field(
-      "meta",
-      dyn.list(dyn.decode2(
-        Meta,
-        dyn.field("name", dyn.string),
-        dyn.field("type", dyn.string),
-      )),
-    ),
-    dyn.field(
-      "data",
-      dyn.list(dyn.decode3(
-        SearchRecord,
-        dyn.field("package_name", dyn.string),
-        dyn.field("description", dyn.string),
-        dyn.field("downloads_all_time", dyn.int),
-      )),
-    ),
-    dyn.field("rows", dyn.int),
-    dyn.field("rows_before_limit_at_least", dyn.int),
-    dyn.field(
-      "statistics",
-      dyn.decode3(
-        models.Statistics,
-        dyn.field("elapsed", dyn.float),
-        dyn.field("rows_read", dyn.int),
-        dyn.field("bytes_read", dyn.int),
-      ),
-    ),
+pub fn decode_search(data: Dynamic) -> Result(SearchRecord, List(DecodeError)) {
+  dyn.decode3(
+    SearchRecord,
+    dyn.element(0, dyn.string),
+    dyn.element(1, dyn.string),
+    dyn.element(2, dyn.int),
   )(data)
 }
 
-pub fn encode_search(search: SearchResponse) {
+pub fn encode_search(search: List(SearchRecord)) {
   let recs =
-    list.map(search.data, fn(x) {
+    list.map(search, fn(x) {
       json.object([
         #("package_name", json.string(x.package_name)),
         #("description", json.string(x.description)),
@@ -82,21 +56,6 @@ pub type PackageResponse {
   )
 }
 
-pub type PackageRecord {
-  PackageRecord(
-    package_name: String,
-    hex_url: String,
-    description: String,
-    licenses: List(String),
-    repository_url: String,
-    owners: List(String),
-    downloads_all_time: Int,
-    hex_updated_at: String,
-    hex_inserted_at: String,
-    // inserted_at: Time,
-  )
-}
-
 pub type PackageHistoryResponse {
   PackageHistoryResponse(
     meta: List(models.Meta),
@@ -104,10 +63,6 @@ pub type PackageHistoryResponse {
     rows: Int,
     statistics: Statistics,
   )
-}
-
-pub type PackageHistory {
-  PackageHistory(package_name: String, downloads: Int, date: String)
 }
 
 pub fn decode_package(
@@ -151,59 +106,78 @@ pub fn decode_package(
   )(data)
 }
 
+/// Package Record
+fn string_to_list(data: Dynamic) -> Result(List(String), List(DecodeError)) {
+  use str <- result.try(dyn.string(data))
+  case str {
+    "" -> Ok([])
+    _ -> Ok(string.split(str, ","))
+  }
+}
+
+pub type PackageRecord {
+  PackageRecord(
+    package_name: String,
+    hex_url: String,
+    description: String,
+    licenses: List(String),
+    repository_url: String,
+    owners: List(String),
+    downloads_all_time: Int,
+    hex_updated_at: String,
+    hex_inserted_at: String,
+  )
+}
+
+pub fn decode_package_record(
+  row: Dynamic,
+) -> Result(PackageRecord, List(DecodeError)) {
+  dyn.decode9(
+    PackageRecord,
+    dyn.element(0, dyn.string),
+    dyn.element(1, dyn.string),
+    dyn.element(2, dyn.string),
+    dyn.element(3, string_to_list),
+    dyn.element(4, dyn.string),
+    dyn.element(5, string_to_list),
+    dyn.element(6, dyn.int),
+    dyn.element(7, dyn.string),
+    dyn.element(8, dyn.string),
+  )(row)
+}
+
+// Package history
+pub type PackageHistory {
+  PackageHistory(package_name: String, downloads: Int, date: String)
+}
+
 pub fn decode_package_history(
   data: Dynamic,
-) -> Result(PackageHistoryResponse, List(DecodeError)) {
-  dyn.decode4(
-    PackageHistoryResponse,
-    dyn.field(
-      "meta",
-      dyn.list(dyn.decode2(
-        Meta,
-        dyn.field("name", dyn.string),
-        dyn.field("type", dyn.string),
-      )),
-    ),
-    dyn.field(
-      "data",
-      dyn.list(dyn.decode3(
-        PackageHistory,
-        dyn.field("package_name", dyn.string),
-        dyn.field("downloads", dyn.int),
-        dyn.field("date", dyn.string),
-      )),
-    ),
-    dyn.field("rows", dyn.int),
-    dyn.field(
-      "statistics",
-      dyn.decode3(
-        models.Statistics,
-        dyn.field("elapsed", dyn.float),
-        dyn.field("rows_read", dyn.int),
-        dyn.field("bytes_read", dyn.int),
-      ),
-    ),
+) -> Result(PackageHistory, List(DecodeError)) {
+  dyn.decode3(
+    PackageHistory,
+    dyn.element(0, dyn.string),
+    dyn.element(1, dyn.int),
+    dyn.element(2, dyn.string),
   )(data)
 }
 
-pub fn encode_package(pkg: PackageResponse, pkg_history: PackageHistoryResponse) {
-  let recs =
-    list.map(pkg.data, fn(x) {
-      json.object([
-        #("package_name", json.string(x.package_name)),
-        #("hex_url", json.string(x.hex_url)),
-        #("description", json.string(x.description)),
-        #("licenses", json.array(from: x.licenses, of: json.string)),
-        #("repository_url", json.string(x.repository_url)),
-        #("owners", json.array(from: x.owners, of: json.string)),
-        #("downloads_all_time", json.int(x.downloads_all_time)),
-        #("hex_updated_at", json.string(x.hex_updated_at)),
-        #("hex_inserted_at", json.string(x.hex_inserted_at)),
-      ])
-    })
+// ,
+pub fn encode_package(pkg: PackageRecord, pkg_history: List(PackageHistory)) {
+  let recs = [
+    #("package_name", json.string(pkg.package_name)),
+    #("hex_url", json.string(pkg.hex_url)),
+    #("description", json.string(pkg.description)),
+    #("licenses", json.array(from: pkg.licenses, of: json.string)),
+    #("repository_url", json.string(pkg.repository_url)),
+    #("owners", json.array(from: pkg.owners, of: json.string)),
+    #("downloads_all_time", json.int(pkg.downloads_all_time)),
+    #("hex_updated_at", json.string(pkg.hex_updated_at)),
+    #("hex_inserted_at", json.string(pkg.hex_inserted_at)),
+  ]
 
   let history =
-    list.map(pkg_history.data, fn(x) {
+    list.map(pkg_history, fn(x) {
       json.object([
         #("package_name", json.string(x.package_name)),
         #("downloads", json.int(x.downloads)),
@@ -212,69 +186,27 @@ pub fn encode_package(pkg: PackageResponse, pkg_history: PackageHistoryResponse)
     })
 
   json.object([
-    #("data", json.preprocessed_array(recs)),
+    #("data", json.object(recs)),
     #("history", json.preprocessed_array(history)),
   ])
 }
 
 /// Home
-pub type HomeResponse {
-  HomeResponse(
-    meta: List(models.Meta),
-    data: List(HomeRecord),
-    rows: Int,
-    statistics: Statistics,
-  )
-}
-
 pub type HomeRecord {
   HomeRecord(num_packages: Int, total_downloads: Int)
 }
 
-pub fn decode_home(data: Dynamic) -> Result(HomeResponse, List(DecodeError)) {
-  dyn.decode4(
-    HomeResponse,
-    dyn.field(
-      "meta",
-      dyn.list(dyn.decode2(
-        Meta,
-        dyn.field("name", dyn.string),
-        dyn.field("type", dyn.string),
-      )),
-    ),
-    dyn.field(
-      "data",
-      dyn.list(dyn.decode2(
-        HomeRecord,
-        dyn.field("num_packages", dyn.int),
-        dyn.field("total_downloads", dyn.int),
-      )),
-    ),
-    dyn.field("rows", dyn.int),
-    dyn.field(
-      "statistics",
-      dyn.decode3(
-        models.Statistics,
-        dyn.field("elapsed", dyn.float),
-        dyn.field("rows_read", dyn.int),
-        dyn.field("bytes_read", dyn.int),
-      ),
-    ),
-  )(data)
+pub fn decode_home(row: Dynamic) -> Result(HomeRecord, List(DecodeError)) {
+  dyn.decode2(HomeRecord, dyn.element(0, dyn.int), dyn.element(1, dyn.int))(row)
 }
 
-pub fn encode_home(pkg: HomeResponse) {
-  let recs = case list.first(pkg.data) {
-    Ok(first) -> first
-    Error(_) -> HomeRecord(0, 0)
-  }
-
+pub fn encode_home(home: HomeRecord) {
   json.object([
     #(
       "data",
       json.object([
-        #("num_packages", json.int(recs.num_packages)),
-        #("total_downloads", json.int(recs.total_downloads)),
+        #("num_packages", json.int(home.num_packages)),
+        #("total_downloads", json.int(home.total_downloads)),
       ]),
     ),
   ])

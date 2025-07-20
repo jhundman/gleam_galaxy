@@ -6,7 +6,7 @@
 
 	let package_history = null;
 
-	$: package_data = data.payload.data[0];
+	$: package_data = data.payload.data;
 	// eslint-disable-next-line
 	$: package_history = data.payload.history.map((item: any) => ({
 		...item,
@@ -21,7 +21,7 @@
 	import AxisX from '$lib/components/custom/graph/AxisX.svelte';
 	import AxisY from '$lib/components/custom/graph/AxisY.svelte';
 	import Tooltip from '$lib/components/custom/graph/Tooltip.svelte';
-	import QuadTree from '$lib/components/custom/graph/QuadTree.svelte';
+	// import QuadTree from '$lib/components/custom/graph/QuadTree.svelte';
 
 	const xKey = 'date';
 	const yKey = 'downloads';
@@ -74,7 +74,7 @@
 		width: 100%;
 		height: 350px;
 	}
-	.circle {
+	/* .circle {
 		position: absolute;
 		border-radius: 50%;
 		background-color: #ffaff3;
@@ -82,5 +82,5 @@
 		pointer-events: none;
 		width: 8px;
 		height: 8px;
-	}
+	} */
 </style>

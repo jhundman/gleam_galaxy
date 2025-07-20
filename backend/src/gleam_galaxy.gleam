@@ -1,15 +1,34 @@
 import dot_env
 import gleam/erlang/process
 import gleam/io
-import gleam/result.{try}
 import gleam_galaxy/job/job
 import gleam_galaxy/router
 import glenvy/dotenv
 import glenvy/env
 import mist
+import simplifile
+import sqlight
 import wisp
 
-// import gleam/io
+fn get_env_with_log(name: String, default: String) -> String {
+  case env.get_string(name) {
+    Ok(key) -> {
+      io.println("Has " <> name)
+      key
+    }
+    Error(_) -> {
+      io.println("Missing " <> name)
+      default
+    }
+  }
+}
+
+fn init_tables(conn: sqlight.Connection) {
+  let assert Ok(sql) = simplifile.read("./src/sql/001_setup.sql")
+  io.println("INIT TABLES")
+  let assert Ok(Nil) = sqlight.exec(sql, conn)
+  io.println("INIT COMPLETE")
+}
 
 pub fn main() {
   io.println("STARTING UP")
@@ -20,36 +39,23 @@ pub fn main() {
 
   // Env vars
   let _ = dotenv.load()
-  let hex_key = case env.get_string("HEX_API_KEY") {
-    Ok(key) -> {
-      io.println("Has Hex Key")
-      key
-    }
-    Error(_) -> {
-      io.println("Missing Hex Key")
-      ""
-    }
-  }
-  let tinybird_key = case env.get_string("TINYBIRD_KEY") {
-    Ok(key) -> {
-      io.println("Has TB Key")
-      key
-    }
-    Error(_) -> {
-      io.println("Missing TB Key")
-      ""
-    }
-  }
+
+  let hex_key = get_env_with_log("HEX_API_KEY", "")
+  let sqlite_path = get_env_with_log("SQLITE_DB", "")
+
+  use conn <- sqlight.with_connection(sqlite_path)
+
+  init_tables(conn)
 
   let assert Ok(_) =
-    router.handle_request(_, tinybird_key)
+    router.handle_request(_, conn)
     |> wisp.mist_handler(secret_key_base)
     |> mist.new
     |> mist.port(8080)
     |> mist.start_http
 
   // Start Cron
-  let assert Ok(_) = job.start_sync(hex_key, tinybird_key)
+  // let assert Ok(_) = job.start_sync(hex_key, conn)
 
   process.sleep_forever()
 }

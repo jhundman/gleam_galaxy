@@ -6,6 +6,7 @@ packages = [
   { name = "certifi", version = "2.12.0", build_tools = ["rebar3"], requirements = [], otp_app = "certifi", source = "hex", outer_checksum = "EE68D85DF22E554040CDB4BE100F33873AC6051387BAF6A8F6CE82272340FF1C" },
   { name = "dot_env", version = "0.5.1", build_tools = ["gleam"], requirements = ["gleam_stdlib", "simplifile"], otp_app = "dot_env", source = "hex", outer_checksum = "AF5C972D6129F67AF3BB00134AB2808D37111A8D61686CFA86F3ADF652548982" },
   { name = "envoy", version = "1.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "envoy", source = "hex", outer_checksum = "CFAACCCFC47654F7E8B75E614746ED924C65BD08B1DE21101548AC314A8B6A41" },
+  { name = "esqlite", version = "0.8.9", build_tools = ["rebar3"], requirements = [], otp_app = "esqlite", source = "hex", outer_checksum = "465AE9AE28AE4192EA54C829FDC90C320447D439A9B2E10946621672FC6A6F8C" },
   { name = "exception", version = "2.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "exception", source = "hex", outer_checksum = "F5580D584F16A20B7FCDCABF9E9BE9A2C1F6AC4F9176FA6DD0B63E3B20D450AA" },
   { name = "filepath", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "filepath", source = "hex", outer_checksum = "EFB6FF65C98B2A16378ABC3EE2B14124168C0CE5201553DE652E2644DCFDB594" },
   { name = "glam", version = "2.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "glam", source = "hex", outer_checksum = "66EC3BCD632E51EED029678F8DF419659C1E57B1A93D874C5131FE220DFAD2B2" },
@@ -35,6 +36,7 @@ packages = [
   { name = "ranger", version = "1.2.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "ranger", source = "hex", outer_checksum = "1566C272B1D141B3BBA38B25CB761EF56E312E79EC0E2DFD4D3C19FB0CC1F98C" },
   { name = "shakespeare", version = "0.1.2", build_tools = ["gleam"], requirements = ["birl", "gleam_erlang", "gleam_otp", "gleam_stdlib"], otp_app = "shakespeare", source = "hex", outer_checksum = "7D978F614F6AAA19B3F9EF927A39791EF1D26F4C6CFABD12AA52FFC65CF5593D" },
   { name = "simplifile", version = "1.7.0", build_tools = ["gleam"], requirements = ["filepath", "gleam_stdlib"], otp_app = "simplifile", source = "hex", outer_checksum = "1D5DFA3A2F9319EC85825F6ED88B8E449F381B0D55A62F5E61424E748E7DDEB0" },
+  { name = "sqlight", version = "0.9.1", build_tools = ["gleam"], requirements = ["esqlite", "gleam_stdlib"], otp_app = "sqlight", source = "hex", outer_checksum = "A495F2892627B2268CCBCC5107EDC1E1AD9547D5F4F21A5DB04CEA72B8931B00" },
   { name = "ssl_verify_fun", version = "1.1.7", build_tools = ["mix", "rebar3", "make"], requirements = [], otp_app = "ssl_verify_fun", source = "hex", outer_checksum = "FE4C190E8F37401D30167C8C405EDA19469F34577987C76DDE613E838BBC67F8" },
   { name = "thoas", version = "1.2.1", build_tools = ["rebar3"], requirements = [], otp_app = "thoas", source = "hex", outer_checksum = "E38697EDFFD6E91BD12CEA41B155115282630075C2A727E7A6B2947F5408B86A" },
   { name = "unicode_util_compat", version = "0.7.0", build_tools = ["rebar3"], requirements = [], otp_app = "unicode_util_compat", source = "hex", outer_checksum = "25EEE6D67DF61960CF6A794239566599B09E17E668D3700247BC498638152521" },
@@ -57,4 +59,6 @@ glenvy = { version = "~> 0.6" }
 mist = { version = ">= 1.0.0 and < 2.0.0" }
 pprint = { version = ">= 1.0.2 and < 2.0.0" }
 shakespeare = { version = "~> 0.1" }
+simplifile = { version = ">= 1.7.0 and < 2.0.0" }
+sqlight = { version = ">= 0.9.1 and < 1.0.0" }
 wisp = { version = "~> 0.14" }
