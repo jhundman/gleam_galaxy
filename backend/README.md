@@ -28,6 +28,6 @@ gleam shell # Run an Erlang shell
 ## Migration commands
 sqlite3 galaxy.sqlite
 .mode csv packages
-.import packages_cleaned.csv packages
-.import package_releases_cleaned.csv package_releases
-.import package_daily_downloads_cleaned.csv package_daily_downloads
+.import --skip 1 packages_cleaned.csv packages
+.import --skip 1 package_releases_cleaned.csv package_releases
+.import --skip 1 package_daily_downloads_cleaned.csv package_daily_downloads

@@ -55,7 +55,7 @@ pub fn main() {
     |> mist.start_http
 
   // Start Cron
-  let assert Ok(_) = job.start_sync(hex_key, conn)
+  // let assert Ok(_) = job.start_sync(hex_key, conn)
 
   process.sleep_forever()
 }
