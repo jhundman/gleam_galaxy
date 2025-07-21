@@ -1,5 +1,5 @@
 import gleam/dict
-import gleam/dynamic as dyn
+
 import gleam/dynamic/decode
 import gleam/erlang/process
 import gleam/float
