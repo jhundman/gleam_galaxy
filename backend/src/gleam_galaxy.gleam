@@ -34,6 +34,12 @@ pub fn main() {
   wisp.configure_logger()
   dot_env.load_default()
 
+  let assert Ok(cwd) = simplifile.current_directory()
+  io.println("Current directory: " <> cwd)
+  let assert Ok(root_files) = simplifile.read_directory("/")
+  io.println("Root directory contents:")
+  echo root_files
+
   let secret_key_base = wisp.random_string(64)
 
   let hex_key = get_env_with_log("HEX_API_KEY", "")
