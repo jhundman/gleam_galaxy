@@ -1,8 +1,9 @@
 import dot_env
 import dot_env/env
+import gleam/dynamic
+import gleam/dynamic/decode
 import gleam/erlang/process
 import gleam/io
-
 import gleam_galaxy/router
 import mist
 import simplifile

@@ -26,7 +26,7 @@ import wisp
 pub fn start_sync(hex_key: String, conn: sqlight.Connection) {
   wisp.log_info("Start Scheduler")
 
-  io.println("\nLatest TS")
+  wisp.log_info("Latest TS")
 
   let state =
     models.State(
@@ -46,11 +46,14 @@ pub fn start_sync(hex_key: String, conn: sqlight.Connection) {
 
 /// Job that Syncs Hex Package Data
 fn sync_data(state: State) -> Nil {
+  wisp.log_info("Start Sync Data")
   let last_updated_at = case get_max_package_updated_at(state.db_connection) {
-    Ok(t) -> t
+    Ok(t) -> {
+      wisp.log_info("Got last_updated_at")
+      t
+    }
     Error(_) ->
       timestamp.system_time()
-      // |> timestamp.add(duration.seconds(-5 * 365 * 24 * 60 * 60))
       |> timestamp.add(duration.seconds(-24 * 60 * 60))
   }
 
@@ -81,13 +84,33 @@ fn sync_data(state: State) -> Nil {
 
 /// Get Max Package Updated At Returns max time from packages table minus 8 hours in case a job failed
 pub fn get_max_package_updated_at(conn: sqlight.Connection) {
+  wisp.log_info("Max TS")
   let sql =
     "
     SELECT MAX(hex_updated_at) AS max_updated_at FROM packages
     "
-  let assert Ok(max_update) =
-    sqlight.query(sql, on: conn, with: [], expecting: decode.string)
 
+  echo sql
+
+  let max_update =
+    sqlight.query(
+      sql,
+      on: conn,
+      with: [],
+      expecting: decode.at([0], decode.string),
+    )
+
+  let max_update = case max_update {
+    Ok(t) -> t
+    Error(e) -> {
+      echo "Error fetching max package updated at: "
+      echo e
+      // Return a list with the current system time as a fallback for consistency
+      [timestamp.system_time() |> timestamp.to_rfc3339(calendar.utc_offset)]
+    }
+  }
+
+  echo max_update
   let init =
     timestamp.system_time()
     |> timestamp.add(duration.seconds(-5 * 365 * 24 * 60 * 60))
@@ -99,6 +122,7 @@ pub fn get_max_package_updated_at(conn: sqlight.Connection) {
       |> Ok()
   }
 
+  wisp.log_info("Max TS Done")
   max_time
   |> result.unwrap(init)
   |> timestamp.add(duration.seconds(-12 * 60 * 60))
@@ -125,7 +149,7 @@ fn sync_updates(state: State) {
 
   // io.debug(list.length(pkgs))
   let end_time = timestamp.system_time()
-  let diff = timestamp.difference(end_time, start)
+  let diff = timestamp.difference(start, end_time)
   let diff_seconds = duration.to_seconds(diff) |> float.round
   io.println("Run Time ----> " <> int.to_string(diff_seconds) <> " seconds")
   process.sleep(30_000)
@@ -425,7 +449,7 @@ fn sync_downloads(state: State) {
     })
 
   let end_time = timestamp.system_time()
-  let diff = timestamp.difference(end_time, start)
+  let diff = timestamp.difference(start, end_time)
   let diff_seconds = duration.to_seconds(diff) |> float.round
   io.println("Run Time ----> " <> int.to_string(diff_seconds) <> " seconds")
 }
