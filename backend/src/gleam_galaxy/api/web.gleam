@@ -1,10 +1,11 @@
 // import gleam/http/response
 // import gleam/int
+import gleam/dynamic/decode
 import gleam/erlang/process
 import gleam/http
 import gleam/json
 import gleam/list
-import gleam/result
+import gleam/string
 import gleam/string_tree
 import gleam_galaxy/api/service
 import gleam_galaxy/job/job
@@ -25,7 +26,8 @@ pub fn handle_api_request(
     ["cron"] -> start_cron(req, conn, hex_key, cron_secret)
     [] -> {
       json.object([#("message", json.string("Hello API World"))])
-      |> json.to_string_builder
+      |> json.to_string
+      |> string_tree.from_string
       |> wisp.json_response(200)
     }
     _ -> {
@@ -53,16 +55,28 @@ fn search_packages(req, conn: sqlight.Connection) -> Response {
         LIMIT 5;
     "
 
+      let search_decoder = {
+        use package_name <- decode.then(decode.at([0], decode.string))
+        use description <- decode.then(decode.at([1], decode.string))
+        use downloads_all_time <- decode.then(decode.at([2], decode.int))
+        decode.success(service.SearchRecord(
+          package_name,
+          description,
+          downloads_all_time,
+        ))
+      }
+
       let assert Ok(search) =
         sqlight.query(
           sql,
           on: conn,
           with: [sqlight.text(q)],
-          expecting: service.decode_search,
+          expecting: search_decoder,
         )
 
       service.encode_search(search)
-      |> json.to_string_builder()
+      |> json.to_string
+      |> string_tree.from_string
       |> wisp.json_response(200)
     }
     _ -> {
@@ -80,15 +94,22 @@ fn get_home(conn: sqlight.Connection) -> Response {
     FROM packages;
   "
 
+  let home_decoder = {
+    use num_packages <- decode.then(decode.at([0], decode.int))
+    use total_downloads <- decode.then(decode.at([1], decode.int))
+    decode.success(service.HomeRecord(num_packages, total_downloads))
+  }
+
   let assert Ok(home) =
-    sqlight.query(sql, on: conn, with: [], expecting: service.decode_home)
+    sqlight.query(sql, on: conn, with: [], expecting: home_decoder)
 
   let assert Ok(home) =
     home
     |> list.first()
 
   service.encode_home(home)
-  |> json.to_string_builder()
+  |> json.to_string
+  |> string_tree.from_string
   |> wisp.json_response(200)
 }
 
@@ -102,22 +123,26 @@ fn start_cron(
     [#("secret", secret)] if secret == cron_secret -> {
       let _ = process.spawn(fn() { job.start_sync(hex_key, conn) })
       json.object([#("message", json.string("Cron job started"))])
-      |> json.to_string()
+      |> json.to_string
+      |> string_tree.from_string
       |> wisp.json_response(200)
     }
-    _ -> wisp.response(401, "Invalid secret")
+    _ -> {
+      json.object([#("error", json.string("Invalid secret"))])
+      |> json.to_string
+      |> string_tree.from_string
+      |> wisp.json_response(401)
+    }
   }
 }
 
 fn get_package(pkg: String, conn: sqlight.Connection) {
-  let package_header = task.async(fn() { get_package_header(pkg, conn) })
-  let package_history = task.async(fn() { get_package_history(pkg, conn) })
-
-  let package_header = task.await(package_header, 500)
-  let package_history = task.await(package_history, 500)
+  let package_header = get_package_header(pkg, conn)
+  let package_history = get_package_history(pkg, conn)
 
   service.encode_package(package_header, package_history)
-  |> json.to_string_builder()
+  |> json.to_string
+  |> string_tree.from_string
   |> wisp.json_response(200)
 }
 
@@ -130,12 +155,55 @@ fn get_package_header(pkg: String, conn: sqlight.Connection) {
   WHERE package_name = ?
   "
 
+  let string_to_list = fn(data) {
+    let decoder =
+      decode.string
+      |> decode.map(fn(str) {
+        case str {
+          "" -> []
+          _ -> string.split(str, ",")
+        }
+      })
+    decode.run(data, decoder)
+  }
+
+  let string_list_decoder =
+    decode.new_primitive_decoder("StringList", fn(data) {
+      case string_to_list(data) {
+        Ok(list) -> Ok(list)
+        Error(_) -> Error([])
+      }
+    })
+
+  let package_decoder = {
+    use package_name <- decode.then(decode.at([0], decode.string))
+    use hex_url <- decode.then(decode.at([1], decode.string))
+    use description <- decode.then(decode.at([2], decode.string))
+    use licenses <- decode.then(decode.at([3], string_list_decoder))
+    use repository_url <- decode.then(decode.at([4], decode.string))
+    use owners <- decode.then(decode.at([5], string_list_decoder))
+    use downloads_all_time <- decode.then(decode.at([6], decode.int))
+    use hex_updated_at <- decode.then(decode.at([7], decode.string))
+    use hex_inserted_at <- decode.then(decode.at([8], decode.string))
+    decode.success(service.PackageRecord(
+      package_name,
+      hex_url,
+      description,
+      licenses,
+      repository_url,
+      owners,
+      downloads_all_time,
+      hex_updated_at,
+      hex_inserted_at,
+    ))
+  }
+
   let assert Ok(response) =
     sqlight.query(
       sql,
       on: conn,
       with: [sqlight.text(pkg)],
-      expecting: service.decode_package_record,
+      expecting: package_decoder,
     )
 
   let assert Ok(response) =
@@ -154,12 +222,19 @@ fn get_package_history(pkg: String, conn: sqlight.Connection) {
     ORDER BY date DESC
     "
 
+  let history_decoder = {
+    use package_name <- decode.then(decode.at([0], decode.string))
+    use downloads <- decode.then(decode.at([1], decode.int))
+    use date <- decode.then(decode.at([2], decode.string))
+    decode.success(service.PackageHistory(package_name, downloads, date))
+  }
+
   let assert Ok(response) =
     sqlight.query(
       sql,
       on: conn,
       with: [sqlight.text(pkg)],
-      expecting: service.decode_package_history,
+      expecting: history_decoder,
     )
 
   response

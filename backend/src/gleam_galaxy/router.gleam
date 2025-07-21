@@ -1,4 +1,5 @@
 import gleam/json
+import gleam/string_tree
 import gleam_galaxy/api/web.{handle_api_request}
 import sqlight
 import wisp.{type Request, type Response}
@@ -26,7 +27,8 @@ pub fn handle_request(
   case wisp.path_segments(req) {
     [] -> {
       json.object([#("message", json.string("Hello World"))])
-      |> json.to_string_builder
+      |> json.to_string
+      |> string_tree.from_string
       |> wisp.json_response(200)
     }
 
@@ -43,12 +45,14 @@ pub fn default_responses(handle_request: fn() -> wisp.Response) -> wisp.Response
   case response.status {
     404 | 405 -> {
       json.object([#("message", json.string("Are you lost fellow traveler?"))])
-      |> json.to_string_builder
+      |> json.to_string
+      |> string_tree.from_string
       |> wisp.json_response(404)
     }
     400 -> {
       json.object([#("message", json.string("Try again"))])
-      |> json.to_string_builder
+      |> json.to_string
+      |> string_tree.from_string
       |> wisp.json_response(400)
     }
 
