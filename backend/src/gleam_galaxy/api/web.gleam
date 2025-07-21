@@ -1,5 +1,6 @@
 // import gleam/http/response
 // import gleam/int
+import gleam/erlang/process
 import gleam/http
 import gleam/json
 import gleam/list
@@ -8,12 +9,17 @@ import gleam_galaxy/api/service
 import sqlight
 import wisp.{type Request, type Response}
 
-pub fn handle_api_request(req: Request, conn: sqlight.Connection) -> Response {
+pub fn handle_api_request(
+  req: Request,
+  conn: sqlight.Connection,
+  hex_key: String,
+) -> Response {
   use <- wisp.require_method(req, http.Get)
   case list.drop(wisp.path_segments(req), 1) {
     ["search"] -> search_packages(req, conn)
     ["home"] -> get_home(conn)
     ["package", pkg] -> get_package(pkg, conn)
+    ["cron"] -> start_cron(req, conn, hex_key, )
     [] -> {
       json.object([#("message", json.string("Hello API World"))])
       |> json.to_string_builder
@@ -81,6 +87,10 @@ fn get_home(conn: sqlight.Connection) -> Response {
   service.encode_home(home)
   |> json.to_string_builder()
   |> wisp.json_response(200)
+}
+
+fn start_cron(conn: sqlight.Connection) -> Response {
+  todo
 }
 
 fn get_package(pkg: String, conn: sqlight.Connection) {

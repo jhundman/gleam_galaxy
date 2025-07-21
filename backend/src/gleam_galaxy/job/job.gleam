@@ -1,8 +1,8 @@
-import birl.{type Time}
-import birl/duration
 import gleam/dict
 import gleam/dynamic as dyn
+import gleam/dynamic/decode
 import gleam/erlang/process
+import gleam/float
 import gleam/hackney
 import gleam/hexpm
 import gleam/http/request
@@ -12,12 +12,13 @@ import gleam/json
 import gleam/list
 import gleam/option
 import gleam/order.{Eq, Gt, Lt}
-import gleam/otp/task
 import gleam/result
+import gleam/time/calendar
+import gleam/time/duration
+import gleam/time/timestamp.{type Timestamp}
 import gleam/uri
 import gleam_galaxy/error.{type Error}
 import gleam_galaxy/models.{type State}
-import shakespeare/actors/periodic.{Ms, start}
 import sqlight
 import wisp
 
@@ -30,16 +31,15 @@ pub fn start_sync(hex_key: String, conn: sqlight.Connection) {
   let state =
     models.State(
       page: 1,
-      last_updated_at: birl.utc_now(),
+      last_updated_at: timestamp.system_time(),
       hex_key: hex_key,
       db_connection: conn,
-      current_time: birl.utc_now(),
+      current_time: timestamp.system_time(),
     )
 
   // Periodic actor takes a function, and sync needs state. Run every 10hr to get 2x a day
   // 36_000_000
-  let cron = fn() { sync_data(state) }
-  start(do: cron, every: Ms(36_000_000))
+  sync_data(state)
 }
 
 // TODO - Change to SQLITE instead of TB
@@ -49,14 +49,20 @@ fn sync_data(state: State) -> Nil {
   let last_updated_at = case get_max_package_updated_at(state.db_connection) {
     Ok(t) -> t
     Error(_) ->
-      birl.utc_now()
-      // |> birl.subtract(duration.years(5))
-      |> birl.subtract(duration.hours(24))
+      timestamp.system_time()
+      // |> timestamp.add(duration.seconds(-5 * 365 * 24 * 60 * 60))
+      |> timestamp.add(duration.seconds(-24 * 60 * 60))
   }
 
   let state = models.State(..state, last_updated_at: last_updated_at)
-  wisp.log_info("Start Cron Job at: " <> state.current_time |> birl.to_iso8601)
-  wisp.log_info("Max Updated At: " <> state.last_updated_at |> birl.to_iso8601)
+  wisp.log_info(
+    "Start Cron Job at: "
+    <> timestamp.to_rfc3339(state.current_time, calendar.utc_offset),
+  )
+  wisp.log_info(
+    "Max Updated At: "
+    <> timestamp.to_rfc3339(state.last_updated_at, calendar.utc_offset),
+  )
 
   // Sync Updates
   wisp.log_info("===== Sync Updates =====")
@@ -67,7 +73,8 @@ fn sync_data(state: State) -> Nil {
   let _ = sync_downloads(state)
 
   wisp.log_info(
-    "Cron Job Completed at: " <> state.current_time |> birl.to_iso8601,
+    "Cron Job Completed at: "
+    <> timestamp.to_rfc3339(state.current_time, calendar.utc_offset),
   )
   Nil
 }
@@ -79,19 +86,14 @@ pub fn get_max_package_updated_at(conn: sqlight.Connection) {
     SELECT MAX(hex_updated_at) AS max_updated_at FROM packages
     "
   let assert Ok(max_update) =
-    sqlight.query(
-      sql,
-      on: conn,
-      with: [],
-      expecting: dyn.element(0, dyn.string),
-    )
+    sqlight.query(sql, on: conn, with: [], expecting: decode.string)
 
   let init =
-    birl.utc_now()
-    |> birl.subtract(duration.years(5))
+    timestamp.system_time()
+    |> timestamp.add(duration.seconds(-5 * 365 * 24 * 60 * 60))
 
   let max_time = case list.first(max_update) {
-    Ok(t) -> birl.parse(t)
+    Ok(t) -> timestamp.parse_rfc3339(t)
     Error(_) ->
       init
       |> Ok()
@@ -99,7 +101,7 @@ pub fn get_max_package_updated_at(conn: sqlight.Connection) {
 
   max_time
   |> result.unwrap(init)
-  |> birl.subtract(duration.hours(12))
+  |> timestamp.add(duration.seconds(-12 * 60 * 60))
   |> Ok()
 }
 
@@ -111,46 +113,33 @@ fn sync_updates(state: State) {
   io.println("LIST LENGTH:" <> int.to_string(list.length(packages)))
 
   use min_date <- result.try(min_timestamp(packages))
-  let start = birl.utc_now()
-
-  // 100 / chunk size = num_tasks
-  let chunks = list.sized_chunk(packages, 100)
-  // io.println("Chunk LENGTH:" <> int.to_string(list.length(chunks)))
-
-  let handles =
-    list.map(chunks, fn(chunk) {
-      task.async(fn() {
-        list.map(chunk, fn(pkg) {
-          process.sleep(1000)
-          process_package(pkg, state)
-        })
-      })
-    })
+  let start = timestamp.system_time()
 
   let pkgs =
-    list.fold(handles, [], fn(acc, handle) {
-      let result = task.await(handle, 600_000)
-      list.concat([result, acc])
+    list.map(packages, fn(pkg) {
+      process.sleep(1000)
+      process_package(pkg, state)
     })
 
   io.println("pkgs LENGTH:" <> int.to_string(list.length(pkgs)))
 
   // io.debug(list.length(pkgs))
-  io.println(
-    "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
-  )
+  let end_time = timestamp.system_time()
+  let diff = timestamp.difference(end_time, start)
+  let diff_seconds = duration.to_seconds(diff) |> float.round
+  io.println("Run Time ----> " <> int.to_string(diff_seconds) <> " seconds")
   process.sleep(30_000)
 
   // If min package updated at greater than or equal to max tb date
   // then keep looping as have not seen all packages
-  let _ = case birl.compare(min_date, state.last_updated_at) {
+  let _ = case timestamp.compare(min_date, state.last_updated_at) {
     Gt | Eq -> {
       io.println(
         "Gt Eq"
         <> " Packages Date"
-        <> birl.to_iso8601(min_date)
+        <> timestamp.to_rfc3339(min_date, calendar.utc_offset)
         <> " Min Date TB: "
-        <> birl.to_iso8601(state.last_updated_at),
+        <> timestamp.to_rfc3339(state.last_updated_at, calendar.utc_offset),
       )
       sync_updates(models.State(..state, page: state.page + 1))
     }
@@ -158,9 +147,9 @@ fn sync_updates(state: State) {
       io.println(
         "LT"
         <> " Packages Date"
-        <> birl.to_iso8601(min_date)
+        <> timestamp.to_rfc3339(min_date, calendar.utc_offset)
         <> " Min Date TB: "
-        <> birl.to_iso8601(state.last_updated_at),
+        <> timestamp.to_rfc3339(state.last_updated_at, calendar.utc_offset),
       )
       Ok(Nil)
     }
@@ -169,18 +158,18 @@ fn sync_updates(state: State) {
   Ok(Nil)
 }
 
-fn min_timestamp(packages: List(hexpm.Package)) -> Result(Time, Error) {
+fn min_timestamp(packages: List(hexpm.Package)) -> Result(Timestamp, Error) {
   // Assume the packages are sorted desc
   let assert Ok(first) = list.first(packages)
   let assert Ok(last) = list.last(packages)
-  case birl.compare(first.updated_at, last.updated_at) {
+  case timestamp.compare(first.updated_at, last.updated_at) {
     Gt | Eq -> Nil
     Lt -> panic as "PACKAGES NOT SORTED CORRECTLY"
   }
 
   case list.last(packages) {
     Ok(last) -> last.updated_at
-    Error(_) -> birl.from_unix(0)
+    Error(_) -> timestamp.from_unix_seconds(0)
   }
   |> Ok()
 }
@@ -200,7 +189,7 @@ fn fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
     |> result.map_error(error.HttpClientError),
   )
   use all_packages <- result.try(
-    json.decode(response.body, using: dyn.list(of: hexpm.decode_package))
+    json.parse(from: response.body, using: dyn.list(hexpm.package_decoder()))
     |> result.map_error(error.JsonDecodeError),
   )
   Ok(all_packages)
@@ -274,7 +263,7 @@ fn lookup_release(
     _ -> Nil
   }
 
-  json.decode(response.body, using: hexpm.decode_release)
+  json.parse(from: response.body, using: hexpm.release_decoder())
   |> result.map_error(error.JsonDecodeError)
 }
 
@@ -289,9 +278,12 @@ fn insert_package_sqlite(pkg: hexpm.Package, conn: sqlight.Connection) {
     |> dict.get("Repository")
     |> result.unwrap("")
 
-  let hex_updated_at = pkg.updated_at |> birl.to_iso8601()
-  let hex_inserted_at = pkg.inserted_at |> birl.to_iso8601()
-  let inserted_at = birl.utc_now() |> birl.to_iso8601()
+  let hex_updated_at =
+    pkg.updated_at |> timestamp.to_rfc3339(calendar.utc_offset)
+  let hex_inserted_at =
+    pkg.inserted_at |> timestamp.to_rfc3339(calendar.utc_offset)
+  let inserted_at =
+    timestamp.system_time() |> timestamp.to_rfc3339(calendar.utc_offset)
   let licenses_json =
     json.array(pkg.meta.licenses, of: json.string) |> json.to_string()
 
@@ -317,7 +309,7 @@ fn insert_package_sqlite(pkg: hexpm.Package, conn: sqlight.Connection) {
       sqlight.text(hex_inserted_at),
       sqlight.text(inserted_at),
     ],
-    expecting: dyn.dynamic,
+    expecting: decode.dynamic,
   )
   |> result.map(fn(_) { Nil })
   |> result.unwrap(Nil)
@@ -338,9 +330,12 @@ fn insert_release_sqlite(
   release: hexpm.Release,
   conn: sqlight.Connection,
 ) {
-  let hex_updated_at = release.updated_at |> birl.to_iso8601()
-  let hex_inserted_at = release.inserted_at |> birl.to_iso8601()
-  let inserted_at = birl.utc_now() |> birl.to_iso8601()
+  let hex_updated_at =
+    release.updated_at |> timestamp.to_rfc3339(calendar.utc_offset)
+  let hex_inserted_at =
+    release.inserted_at |> timestamp.to_rfc3339(calendar.utc_offset)
+  let inserted_at =
+    timestamp.system_time() |> timestamp.to_rfc3339(calendar.utc_offset)
 
   let sql =
     "
@@ -362,7 +357,7 @@ fn insert_release_sqlite(
       sqlight.text(hex_inserted_at),
       sqlight.text(inserted_at),
     ],
-    expecting: dyn.dynamic,
+    expecting: decode.dynamic,
   )
   |> result.map(fn(_) { Nil })
   |> result.unwrap(Nil)
@@ -391,7 +386,7 @@ pub fn fetch_package(package_name: String, hex_key: String) {
   }
 
   use package <- result.try(
-    json.decode(response.body, using: hexpm.decode_package)
+    json.parse(from: response.body, using: hexpm.package_decoder())
     |> result.map_error(error.JsonDecodeError),
   )
 
@@ -415,26 +410,13 @@ fn sync_downloads(state: State) {
     Error(_) -> []
   }
 
-  let start = birl.utc_now()
-
-  let chunk_size = list.length(packages) / 1
-  let chunks = list.sized_chunk(packages, chunk_size)
-
-  let handles =
-    list.map(chunks, fn(chunk) {
-      task.async(fn() {
-        list.map(chunk, fn(pkg) {
-          process.sleep(1000)
-          io.println("Getting downloads - " <> pkg)
-          fetch_package(pkg, state.hex_key)
-        })
-      })
-    })
+  let start = timestamp.system_time()
 
   let download_results =
-    list.fold(handles, [], fn(acc, handle) {
-      let result = task.await(handle, 3_600_000)
-      list.concat([result, acc])
+    list.map(packages, fn(pkg) {
+      process.sleep(1000)
+      io.println("Getting downloads - " <> pkg)
+      fetch_package(pkg, state.hex_key)
     })
 
   let _ =
@@ -442,9 +424,10 @@ fn sync_downloads(state: State) {
       insert_package_daily_downloads_sqlite(result, state.db_connection)
     })
 
-  io.println(
-    "Run Time ----> " <> birl.legible_difference(birl.utc_now(), start),
-  )
+  let end_time = timestamp.system_time()
+  let diff = timestamp.difference(end_time, start)
+  let diff_seconds = duration.to_seconds(diff) |> float.round
+  io.println("Run Time ----> " <> int.to_string(diff_seconds) <> " seconds")
 }
 
 fn get_list_gleam_packages_sqlite(conn: sqlight.Connection) {
@@ -452,12 +435,7 @@ fn get_list_gleam_packages_sqlite(conn: sqlight.Connection) {
     "SELECT DISTINCT package_name FROM packages ORDER BY downloads_all_time DESC"
 
   use packages <- result.try(
-    sqlight.query(
-      sql,
-      on: conn,
-      with: [],
-      expecting: dyn.element(0, dyn.string),
-    )
+    sqlight.query(sql, on: conn, with: [], expecting: decode.string)
     |> result.map_error(error.DatabaseError),
   )
 
@@ -476,12 +454,19 @@ fn insert_package_daily_downloads_sqlite(
         |> result.unwrap(0)
 
       let date =
-        birl.utc_now()
-        |> birl.to_naive_date_string()
+        timestamp.system_time()
+        |> timestamp.to_calendar(calendar.utc_offset)
+        |> fn(cal) {
+          { cal.0 }.year |> int.to_string
+          <> "-"
+          <> format_month({ cal.0 }.month)
+          <> "-"
+          <> format_day({ cal.0 }.day)
+        }
 
       let inserted_at =
-        birl.utc_now()
-        |> birl.to_iso8601()
+        timestamp.system_time()
+        |> timestamp.to_rfc3339(calendar.utc_offset)
 
       let sql =
         "
@@ -499,11 +484,35 @@ fn insert_package_daily_downloads_sqlite(
           sqlight.int(downloads_yesterday),
           sqlight.text(inserted_at),
         ],
-        expecting: dyn.dynamic,
+        expecting: decode.dynamic,
       )
       |> result.map(fn(_) { Nil })
       |> result.unwrap(Nil)
     }
     Error(_) -> Nil
+  }
+}
+
+fn format_month(month: calendar.Month) -> String {
+  case month {
+    calendar.January -> "01"
+    calendar.February -> "02"
+    calendar.March -> "03"
+    calendar.April -> "04"
+    calendar.May -> "05"
+    calendar.June -> "06"
+    calendar.July -> "07"
+    calendar.August -> "08"
+    calendar.September -> "09"
+    calendar.October -> "10"
+    calendar.November -> "11"
+    calendar.December -> "12"
+  }
+}
+
+fn format_day(day: Int) -> String {
+  case day < 10 {
+    True -> "0" <> int.to_string(day)
+    False -> int.to_string(day)
   }
 }

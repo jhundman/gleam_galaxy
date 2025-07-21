@@ -1,14 +1,14 @@
-import birl.{type Time}
+import gleam/time/timestamp.{type Timestamp}
 import sqlight
 
 // Service State
 pub type State {
   State(
     page: Int,
-    last_updated_at: Time,
+    last_updated_at: Timestamp,
     hex_key: String,
     db_connection: sqlight.Connection,
-    current_time: Time,
+    current_time: Timestamp,
   )
 }
 
