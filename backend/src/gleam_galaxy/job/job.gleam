@@ -189,7 +189,7 @@ fn fetch_packages(state: State) -> Result(List(hexpm.Package), Error) {
     |> result.map_error(error.HttpClientError),
   )
   use all_packages <- result.try(
-    json.parse(from: response.body, using: dyn.list(hexpm.package_decoder()))
+    json.parse(from: response.body, using: decode.list(hexpm.package_decoder()))
     |> result.map_error(error.JsonDecodeError),
   )
   Ok(all_packages)
