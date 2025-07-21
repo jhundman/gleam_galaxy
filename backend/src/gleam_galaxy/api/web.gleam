@@ -1,10 +1,9 @@
-// import gleam/http/response
-// import gleam/int
 import gleam/dynamic/decode
 import gleam/erlang/process
 import gleam/http
 import gleam/json
 import gleam/list
+
 import gleam/string
 import gleam/string_tree
 import gleam_galaxy/api/service
@@ -136,23 +135,37 @@ fn start_cron(
   }
 }
 
-fn get_package(pkg: String, conn: sqlight.Connection) {
-  let package_header = get_package_header(pkg, conn)
-  let package_history = get_package_history(pkg, conn)
-
-  service.encode_package(package_header, package_history)
-  |> json.to_string
-  |> string_tree.from_string
-  |> wisp.json_response(200)
+fn get_package(pkg: String, conn: sqlight.Connection) -> Response {
+  case get_package_header(pkg, conn) {
+    Ok(package_header) -> {
+      let package_history = get_package_history(pkg, conn)
+      service.encode_package(package_header, package_history)
+      |> json.to_string
+      |> string_tree.from_string
+      |> wisp.json_response(200)
+    }
+    Error(_) -> wisp.response(404)
+  }
 }
 
-fn get_package_header(pkg: String, conn: sqlight.Connection) {
+fn get_package_header(
+  pkg: String,
+  conn: sqlight.Connection,
+) -> Result(service.PackageRecord, Nil) {
   let sql =
     "
   SELECT
-    *
-  FROM packages
-  WHERE package_name = ?
+    p.package_name,
+    p.hex_url,
+    p.description,
+    p.licenses,
+    p.repository_url,
+    (SELECT GROUP_CONCAT(po.owner) FROM package_owners po WHERE po.package_name = p.package_name) AS owners,
+    p.downloads_all_time,
+    p.hex_updated_at,
+    p.hex_inserted_at
+  FROM packages p
+  WHERE p.package_name = ?;
   "
 
   let string_to_list = fn(data) {
@@ -198,7 +211,7 @@ fn get_package_header(pkg: String, conn: sqlight.Connection) {
     ))
   }
 
-  let assert Ok(response) =
+  let result =
     sqlight.query(
       sql,
       on: conn,
@@ -206,11 +219,14 @@ fn get_package_header(pkg: String, conn: sqlight.Connection) {
       expecting: package_decoder,
     )
 
-  let assert Ok(response) =
-    response
-    |> list.first()
-
-  response
+  case result {
+    Ok(records) ->
+      case list.first(records) {
+        Ok(record) -> Ok(record)
+        Error(_) -> Error(Nil)
+      }
+    Error(_) -> Error(Nil)
+  }
 }
 
 fn get_package_history(pkg: String, conn: sqlight.Connection) {
@@ -239,4 +255,3 @@ fn get_package_history(pkg: String, conn: sqlight.Connection) {
 
   response
 }
-// TODO - Add CSV export endpoint
