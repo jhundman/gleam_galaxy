@@ -1,12 +1,14 @@
 import dot_env
+import dot_env/env
 import gleam/erlang/process
 import gleam/io
-import gleam_galaxy/job/job
+
 import gleam_galaxy/router
 import mist
 import simplifile
 import sqlight
 import wisp
+import wisp/wisp_mist
 
 fn get_env_with_log(name: String, default: String) -> String {
   case env.get_string(name) {
@@ -31,7 +33,7 @@ fn init_tables(conn: sqlight.Connection) {
 pub fn main() {
   io.println("STARTING UP")
   wisp.configure_logger()
-  dot_env.load()
+  dot_env.load_default()
 
   let secret_key_base = wisp.random_string(64)
 
@@ -44,10 +46,12 @@ pub fn main() {
   init_tables(conn)
 
   let assert Ok(_) =
-    router.handle_request(_, conn, hex_key, cron_secret)
-    |> wisp.mist_handler(secret_key_base)
+    wisp_mist.handler(
+      router.handle_request(_, conn, hex_key, cron_secret),
+      secret_key_base,
+    )
     |> mist.new
     |> mist.port(8080)
-    |> mist.start_http
+    |> mist.start
   process.sleep_forever()
 }
