@@ -26,17 +26,12 @@ pub type SearchRecord {
 }
 
 pub fn decode_search(data: Dynamic) -> Result(SearchRecord, List(DecodeError)) {
-  let decoder =
-    decode.at([0], decode.string)
-    |> decode.then(fn(package_name) {
-      decode.at([1], decode.string)
-      |> decode.then(fn(description) {
-        decode.at([2], decode.int)
-        |> decode.map(fn(downloads_all_time) {
-          SearchRecord(package_name, description, downloads_all_time)
-        })
-      })
-    })
+  let decoder = {
+    use package_name <- decode.then(decode.at([0], decode.string))
+    use description <- decode.then(decode.at([1], decode.string))
+    use downloads_all_time <- decode.then(decode.at([2], decode.int))
+    decode.success(SearchRecord(package_name, description, downloads_all_time))
+  }
   decode.run(data, decoder)
 }
 
@@ -160,46 +155,28 @@ pub fn decode_package_record(
       }
     })
 
-  let decoder =
-    decode.at([0], decode.string)
-    |> decode.then(fn(package_name) {
-      decode.at([1], decode.string)
-      |> decode.then(fn(hex_url) {
-        decode.at([2], decode.string)
-        |> decode.then(fn(description) {
-          decode.at([3], string_list_decoder)
-          |> decode.then(fn(licenses) {
-            decode.at([4], decode.string)
-            |> decode.then(fn(repository_url) {
-              decode.at([5], string_list_decoder)
-              |> decode.then(fn(owners) {
-                decode.at([6], decode.int)
-                |> decode.then(fn(downloads_all_time) {
-                  decode.at([7], decode.string)
-                  |> decode.then(fn(hex_updated_at) {
-                    decode.at([8], decode.string)
-                    |> decode.map(fn(hex_inserted_at) {
-                      PackageRecord(
-                        package_name,
-                        hex_url,
-                        description,
-                        licenses,
-                        repository_url,
-                        owners,
-                        downloads_all_time,
-                        hex_updated_at,
-                        hex_inserted_at,
-                      )
-                    })
-                  })
-                })
-              })
-            })
-          })
-        })
-      })
-    })
-
+  let decoder = {
+    use package_name <- decode.then(decode.at([0], decode.string))
+    use hex_url <- decode.then(decode.at([1], decode.string))
+    use description <- decode.then(decode.at([2], decode.string))
+    use licenses <- decode.then(decode.at([3], string_list_decoder))
+    use repository_url <- decode.then(decode.at([4], decode.string))
+    use owners <- decode.then(decode.at([5], string_list_decoder))
+    use downloads_all_time <- decode.then(decode.at([6], decode.int))
+    use hex_updated_at <- decode.then(decode.at([7], decode.string))
+    use hex_inserted_at <- decode.then(decode.at([8], decode.string))
+    decode.success(PackageRecord(
+      package_name,
+      hex_url,
+      description,
+      licenses,
+      repository_url,
+      owners,
+      downloads_all_time,
+      hex_updated_at,
+      hex_inserted_at,
+    ))
+  }
   decode.run(row, decoder)
 }
 
@@ -211,15 +188,12 @@ pub type PackageHistory {
 pub fn decode_package_history(
   data: Dynamic,
 ) -> Result(PackageHistory, List(DecodeError)) {
-  let decoder =
-    decode.at([0], decode.string)
-    |> decode.then(fn(package_name) {
-      decode.at([1], decode.int)
-      |> decode.then(fn(downloads) {
-        decode.at([2], decode.string)
-        |> decode.map(fn(date) { PackageHistory(package_name, downloads, date) })
-      })
-    })
+  let decoder = {
+    use package_name <- decode.then(decode.at([0], decode.string))
+    use downloads <- decode.then(decode.at([1], decode.int))
+    use date <- decode.then(decode.at([2], decode.string))
+    decode.success(PackageHistory(package_name, downloads, date))
+  }
   decode.run(data, decoder)
 }
 
@@ -258,14 +232,11 @@ pub type HomeRecord {
 }
 
 pub fn decode_home(row: Dynamic) -> Result(HomeRecord, List(DecodeError)) {
-  let decoder =
-    decode.at([0], decode.int)
-    |> decode.then(fn(num_packages) {
-      decode.at([1], decode.int)
-      |> decode.map(fn(total_downloads) {
-        HomeRecord(num_packages, total_downloads)
-      })
-    })
+  let decoder = {
+    use num_packages <- decode.then(decode.at([0], decode.int))
+    use total_downloads <- decode.then(decode.at([1], decode.int))
+    decode.success(HomeRecord(num_packages, total_downloads))
+  }
   decode.run(row, decoder)
 }
 
