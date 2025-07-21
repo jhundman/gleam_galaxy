@@ -19,7 +19,7 @@ pub fn handle_api_request(
     ["search"] -> search_packages(req, conn)
     ["home"] -> get_home(conn)
     ["package", pkg] -> get_package(pkg, conn)
-    ["cron"] -> start_cron(req, conn, hex_key, )
+    ["cron"] -> start_cron(conn)
     [] -> {
       json.object([#("message", json.string("Hello API World"))])
       |> json.to_string_builder

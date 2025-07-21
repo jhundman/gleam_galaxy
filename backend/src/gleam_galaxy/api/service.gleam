@@ -1,7 +1,8 @@
-import gleam/dynamic.{type DecodeError, type Dynamic} as dyn
+import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode.{type DecodeError}
 import gleam/json
 import gleam/list
-import gleam/result
+
 import gleam/string
 import gleam_galaxy/models.{type Statistics, Meta}
 
@@ -25,12 +26,18 @@ pub type SearchRecord {
 }
 
 pub fn decode_search(data: Dynamic) -> Result(SearchRecord, List(DecodeError)) {
-  dyn.decode3(
-    SearchRecord,
-    dyn.element(0, dyn.string),
-    dyn.element(1, dyn.string),
-    dyn.element(2, dyn.int),
-  )(data)
+  let decoder =
+    decode.at([0], decode.string)
+    |> decode.then(fn(package_name) {
+      decode.at([1], decode.string)
+      |> decode.then(fn(description) {
+        decode.at([2], decode.int)
+        |> decode.map(fn(downloads_all_time) {
+          SearchRecord(package_name, description, downloads_all_time)
+        })
+      })
+    })
+  decode.run(data, decoder)
 }
 
 pub fn encode_search(search: List(SearchRecord)) {
@@ -68,51 +75,64 @@ pub type PackageHistoryResponse {
 pub fn decode_package(
   data: Dynamic,
 ) -> Result(PackageResponse, List(DecodeError)) {
-  dyn.decode4(
-    PackageResponse,
-    dyn.field(
-      "meta",
-      dyn.list(dyn.decode2(
-        Meta,
-        dyn.field("name", dyn.string),
-        dyn.field("type", dyn.string),
-      )),
-    ),
-    dyn.field(
-      "data",
-      dyn.list(dyn.decode9(
-        PackageRecord,
-        dyn.field("package_name", dyn.string),
-        dyn.field("hex_url", dyn.string),
-        dyn.field("description", dyn.string),
-        dyn.field("licenses", dyn.list(dyn.string)),
-        dyn.field("repository_url", dyn.string),
-        dyn.field("owners", dyn.list(dyn.string)),
-        dyn.field("downloads_all_time", dyn.int),
-        dyn.field("hex_updated_at", dyn.string),
-        dyn.field("hex_inserted_at", dyn.string),
-      )),
-    ),
-    dyn.field("rows", dyn.int),
-    dyn.field(
-      "statistics",
-      dyn.decode3(
-        models.Statistics,
-        dyn.field("elapsed", dyn.float),
-        dyn.field("rows_read", dyn.int),
-        dyn.field("bytes_read", dyn.int),
-      ),
-    ),
-  )(data)
+  let meta_decoder = {
+    use name <- decode.field("name", decode.string)
+    use type_ <- decode.field("type", decode.string)
+    decode.success(Meta(name, type_))
+  }
+
+  let package_record_decoder = {
+    use package_name <- decode.field("package_name", decode.string)
+    use hex_url <- decode.field("hex_url", decode.string)
+    use description <- decode.field("description", decode.string)
+    use licenses <- decode.field("licenses", decode.list(decode.string))
+    use repository_url <- decode.field("repository_url", decode.string)
+    use owners <- decode.field("owners", decode.list(decode.string))
+    use downloads_all_time <- decode.field("downloads_all_time", decode.int)
+    use hex_updated_at <- decode.field("hex_updated_at", decode.string)
+    use hex_inserted_at <- decode.field("hex_inserted_at", decode.string)
+    decode.success(PackageRecord(
+      package_name,
+      hex_url,
+      description,
+      licenses,
+      repository_url,
+      owners,
+      downloads_all_time,
+      hex_updated_at,
+      hex_inserted_at,
+    ))
+  }
+
+  let statistics_decoder = {
+    use elapsed <- decode.field("elapsed", decode.float)
+    use rows_read <- decode.field("rows_read", decode.int)
+    use bytes_read <- decode.field("bytes_read", decode.int)
+    decode.success(models.Statistics(elapsed, rows_read, bytes_read))
+  }
+
+  let decoder = {
+    use meta <- decode.field("meta", decode.list(meta_decoder))
+    use data <- decode.field("data", decode.list(package_record_decoder))
+    use rows <- decode.field("rows", decode.int)
+    use statistics <- decode.field("statistics", statistics_decoder)
+    decode.success(PackageResponse(meta, data, rows, statistics))
+  }
+
+  decode.run(data, decoder)
 }
 
 /// Package Record
 fn string_to_list(data: Dynamic) -> Result(List(String), List(DecodeError)) {
-  use str <- result.try(dyn.string(data))
-  case str {
-    "" -> Ok([])
-    _ -> Ok(string.split(str, ","))
-  }
+  let decoder =
+    decode.string
+    |> decode.map(fn(str) {
+      case str {
+        "" -> []
+        _ -> string.split(str, ",")
+      }
+    })
+  decode.run(data, decoder)
 }
 
 pub type PackageRecord {
@@ -132,18 +152,55 @@ pub type PackageRecord {
 pub fn decode_package_record(
   row: Dynamic,
 ) -> Result(PackageRecord, List(DecodeError)) {
-  dyn.decode9(
-    PackageRecord,
-    dyn.element(0, dyn.string),
-    dyn.element(1, dyn.string),
-    dyn.element(2, dyn.string),
-    dyn.element(3, string_to_list),
-    dyn.element(4, dyn.string),
-    dyn.element(5, string_to_list),
-    dyn.element(6, dyn.int),
-    dyn.element(7, dyn.string),
-    dyn.element(8, dyn.string),
-  )(row)
+  let string_list_decoder =
+    decode.new_primitive_decoder("StringList", fn(data) {
+      case string_to_list(data) {
+        Ok(list) -> Ok(list)
+        Error(_) -> Error([])
+      }
+    })
+
+  let decoder =
+    decode.at([0], decode.string)
+    |> decode.then(fn(package_name) {
+      decode.at([1], decode.string)
+      |> decode.then(fn(hex_url) {
+        decode.at([2], decode.string)
+        |> decode.then(fn(description) {
+          decode.at([3], string_list_decoder)
+          |> decode.then(fn(licenses) {
+            decode.at([4], decode.string)
+            |> decode.then(fn(repository_url) {
+              decode.at([5], string_list_decoder)
+              |> decode.then(fn(owners) {
+                decode.at([6], decode.int)
+                |> decode.then(fn(downloads_all_time) {
+                  decode.at([7], decode.string)
+                  |> decode.then(fn(hex_updated_at) {
+                    decode.at([8], decode.string)
+                    |> decode.map(fn(hex_inserted_at) {
+                      PackageRecord(
+                        package_name,
+                        hex_url,
+                        description,
+                        licenses,
+                        repository_url,
+                        owners,
+                        downloads_all_time,
+                        hex_updated_at,
+                        hex_inserted_at,
+                      )
+                    })
+                  })
+                })
+              })
+            })
+          })
+        })
+      })
+    })
+
+  decode.run(row, decoder)
 }
 
 // Package history
@@ -154,12 +211,16 @@ pub type PackageHistory {
 pub fn decode_package_history(
   data: Dynamic,
 ) -> Result(PackageHistory, List(DecodeError)) {
-  dyn.decode3(
-    PackageHistory,
-    dyn.element(0, dyn.string),
-    dyn.element(1, dyn.int),
-    dyn.element(2, dyn.string),
-  )(data)
+  let decoder =
+    decode.at([0], decode.string)
+    |> decode.then(fn(package_name) {
+      decode.at([1], decode.int)
+      |> decode.then(fn(downloads) {
+        decode.at([2], decode.string)
+        |> decode.map(fn(date) { PackageHistory(package_name, downloads, date) })
+      })
+    })
+  decode.run(data, decoder)
 }
 
 // ,
@@ -197,7 +258,15 @@ pub type HomeRecord {
 }
 
 pub fn decode_home(row: Dynamic) -> Result(HomeRecord, List(DecodeError)) {
-  dyn.decode2(HomeRecord, dyn.element(0, dyn.int), dyn.element(1, dyn.int))(row)
+  let decoder =
+    decode.at([0], decode.int)
+    |> decode.then(fn(num_packages) {
+      decode.at([1], decode.int)
+      |> decode.map(fn(total_downloads) {
+        HomeRecord(num_packages, total_downloads)
+      })
+    })
+  decode.run(row, decoder)
 }
 
 pub fn encode_home(home: HomeRecord) {
