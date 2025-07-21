@@ -4,8 +4,10 @@ import gleam/erlang/process
 import gleam/http
 import gleam/json
 import gleam/list
-import gleam/otp/task
+import gleam/result
+import gleam/string_tree
 import gleam_galaxy/api/service
+import gleam_galaxy/job/job
 import sqlight
 import wisp.{type Request, type Response}
 
@@ -13,13 +15,14 @@ pub fn handle_api_request(
   req: Request,
   conn: sqlight.Connection,
   hex_key: String,
+  cron_secret: String,
 ) -> Response {
   use <- wisp.require_method(req, http.Get)
   case list.drop(wisp.path_segments(req), 1) {
     ["search"] -> search_packages(req, conn)
     ["home"] -> get_home(conn)
     ["package", pkg] -> get_package(pkg, conn)
-    ["cron"] -> start_cron(conn)
+    ["cron"] -> start_cron(req, conn, hex_key, cron_secret)
     [] -> {
       json.object([#("message", json.string("Hello API World"))])
       |> json.to_string_builder
@@ -89,8 +92,21 @@ fn get_home(conn: sqlight.Connection) -> Response {
   |> wisp.json_response(200)
 }
 
-fn start_cron(conn: sqlight.Connection) -> Response {
-  todo
+fn start_cron(
+  req: Request,
+  conn: sqlight.Connection,
+  hex_key: String,
+  cron_secret: String,
+) -> Response {
+  case wisp.get_query(req) {
+    [#("secret", secret)] if secret == cron_secret -> {
+      let _ = process.spawn(fn() { job.start_sync(hex_key, conn) })
+      json.object([#("message", json.string("Cron job started"))])
+      |> json.to_string()
+      |> wisp.json_response(200)
+    }
+    _ -> wisp.response(401, "Invalid secret")
+  }
 }
 
 fn get_package(pkg: String, conn: sqlight.Connection) {

@@ -15,7 +15,12 @@ pub fn middleware(
   handle_request(req)
 }
 
-pub fn handle_request(req: Request, conn: sqlight.Connection) -> Response {
+pub fn handle_request(
+  req: Request,
+  conn: sqlight.Connection,
+  hex_key: String,
+  cron_secret: String,
+) -> Response {
   use _req <- middleware(req)
 
   case wisp.path_segments(req) {
@@ -25,7 +30,7 @@ pub fn handle_request(req: Request, conn: sqlight.Connection) -> Response {
       |> wisp.json_response(200)
     }
 
-    ["api", ..] -> handle_api_request(req, conn)
+    ["api", ..] -> handle_api_request(req, conn, hex_key, cron_secret)
 
     _ -> {
       wisp.response(404)
