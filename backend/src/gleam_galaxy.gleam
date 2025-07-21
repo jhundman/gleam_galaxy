@@ -56,6 +56,7 @@ pub fn main() {
       secret_key_base,
     )
     |> mist.new
+    |> mist.bind("0.0.0.0")
     |> mist.port(8080)
     |> mist.start
   process.sleep_forever()

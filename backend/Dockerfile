@@ -2,7 +2,7 @@
 FROM ghcr.io/gleam-lang/gleam:v1.11.1-erlang-alpine
 
 # Install the C compiler and other essential build tools
-RUN apk add --no-cache build-base
+RUN apk add --no-cache build-base sqlite
 
 # Add project code
 WORKDIR /app/
