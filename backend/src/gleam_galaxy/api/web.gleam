@@ -136,6 +136,7 @@ fn start_cron(
 }
 
 fn get_package(pkg: String, conn: sqlight.Connection) -> Response {
+  echo "Fetching package" <> pkg
   case get_package_header(pkg, conn) {
     Ok(package_header) -> {
       let package_history = get_package_history(pkg, conn)
@@ -152,6 +153,7 @@ fn get_package_header(
   pkg: String,
   conn: sqlight.Connection,
 ) -> Result(service.PackageRecord, Nil) {
+  echo "header"
   let sql =
     "
   SELECT
@@ -160,7 +162,7 @@ fn get_package_header(
     p.description,
     p.licenses,
     p.repository_url,
-    (SELECT GROUP_CONCAT(po.owner) FROM package_owners po WHERE po.package_name = p.package_name) AS owners,
+    p.owners,
     p.downloads_all_time,
     p.hex_updated_at,
     p.hex_inserted_at
@@ -218,6 +220,8 @@ fn get_package_header(
       with: [sqlight.text(pkg)],
       expecting: package_decoder,
     )
+
+  echo result
 
   case result {
     Ok(records) ->
