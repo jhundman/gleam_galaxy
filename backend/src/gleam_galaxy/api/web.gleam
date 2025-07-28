@@ -153,7 +153,6 @@ fn get_package_header(
   pkg: String,
   conn: sqlight.Connection,
 ) -> Result(service.PackageRecord, Nil) {
-  echo "header"
   let sql =
     "
   SELECT
@@ -220,8 +219,6 @@ fn get_package_header(
       with: [sqlight.text(pkg)],
       expecting: package_decoder,
     )
-
-  echo result
 
   case result {
     Ok(records) ->
