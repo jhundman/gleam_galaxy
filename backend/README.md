@@ -33,5 +33,3 @@ sqlite3 galaxy.sqlite
 .import --skip 1 package_daily_downloads.csv package_daily_downloads
 
 test
-
-t
