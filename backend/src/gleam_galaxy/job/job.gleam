@@ -67,9 +67,9 @@ fn sync_data(state: State) -> Nil {
     <> timestamp.to_rfc3339(state.last_updated_at, calendar.utc_offset),
   )
 
-  // Sync Updates
-  wisp.log_info("===== Sync Updates =====")
-  let _ = sync_updates(state)
+  // // Sync Updates
+  // wisp.log_info("===== Sync Updates =====")
+  // let _ = sync_updates(state)
 
   // Sync Downloads
   wisp.log_info("===== Sync Downloads =====")
@@ -131,20 +131,83 @@ pub fn get_max_package_updated_at(conn: sqlight.Connection) {
 
 /// Sync Package Updates ==========================================================================
 fn sync_updates(state: State) {
-  use packages <- result.try(fetch_packages(state))
+  wisp.log_info("Starting sync_updates for page " <> int.to_string(state.page))
+
+  use packages <- result.try(case fetch_packages(state) {
+    Ok(pkgs) -> {
+      wisp.log_info(
+        "Successfully fetched "
+        <> int.to_string(list.length(pkgs))
+        <> " packages",
+      )
+      Ok(pkgs)
+    }
+    Error(err) -> {
+      wisp.log_error("Failed to fetch packages")
+      echo err
+      Error(err)
+    }
+  })
   // TESTING: Limit to first 3 packages to avoid hitting API too much
   // let packages = list.take(packages, 1)
   io.println("LIST LENGTH:" <> int.to_string(list.length(packages)))
 
-  use min_date <- result.try(min_timestamp(packages))
+  use min_date <- result.try(case min_timestamp(packages) {
+    Ok(date) -> {
+      wisp.log_info(
+        "Min timestamp: " <> timestamp.to_rfc3339(date, calendar.utc_offset),
+      )
+      Ok(date)
+    }
+    Error(err) -> {
+      wisp.log_error("Failed to get min timestamp")
+      echo err
+      Error(err)
+    }
+  })
   let start = timestamp.system_time()
 
   let pkgs =
     list.map(packages, fn(pkg) {
       process.sleep(1000)
-      process_package(pkg, state)
+      case process_package(pkg, state) {
+        Ok(_) -> {
+          wisp.log_info("Successfully processed package: " <> pkg.name)
+          Ok(state)
+        }
+        Error(err) -> {
+          wisp.log_error("Failed to process package " <> pkg.name)
+          echo err
+          Error(err)
+        }
+      }
     })
 
+  let successful_pkgs =
+    list.filter(pkgs, fn(result) {
+      case result {
+        Ok(_) -> True
+        Error(_) -> False
+      }
+    })
+  let failed_pkgs =
+    list.filter(pkgs, fn(result) {
+      case result {
+        Ok(_) -> False
+        Error(_) -> True
+      }
+    })
+
+  wisp.log_info(
+    "Processed "
+    <> int.to_string(list.length(successful_pkgs))
+    <> " packages successfully",
+  )
+  wisp.log_info(
+    "Failed to process "
+    <> int.to_string(list.length(failed_pkgs))
+    <> " packages",
+  )
   io.println("pkgs LENGTH:" <> int.to_string(list.length(pkgs)))
 
   // io.debug(list.length(pkgs))
@@ -420,15 +483,27 @@ pub fn fetch_package(package_name: String, hex_key: String) {
 // Sync Downloads =======================================================================
 
 fn sync_downloads(state: State) {
+  wisp.log_info("Starting sync_downloads")
+
   let packages = case get_list_gleam_packages_sqlite(state.db_connection) {
     Ok(packages) -> {
       // TESTING: Limit to first 5 packages to avoid hitting API too much
       // let packages = list.take(packages, 1) // Uncomment for testing, e.g., list.take(packages, 1)
+      wisp.log_info(
+        "Found "
+        <> int.to_string(list.length(packages))
+        <> " packages to get downloads for",
+      )
       { int.to_string(list.length(packages)) <> " Packages to Get Downloads" }
       |> io.println()
       packages
     }
-    Error(_) -> []
+    Error(err) -> {
+      wisp.log_error("Failed to get package list from database")
+      echo err
+      echo "sync_downloads error"
+      []
+    }
   }
 
   let start = timestamp.system_time()
@@ -437,8 +512,44 @@ fn sync_downloads(state: State) {
     list.map(packages, fn(pkg) {
       process.sleep(1000)
       io.println("Getting downloads - " <> pkg)
-      fetch_package(pkg, state.hex_key)
+      case fetch_package(pkg, state.hex_key) {
+        Ok(package) -> {
+          wisp.log_info("Successfully fetched downloads for: " <> pkg)
+          Ok(package)
+        }
+        Error(err) -> {
+          wisp.log_error("Failed to fetch downloads for " <> pkg)
+          echo err
+          Error(err)
+        }
+      }
     })
+
+  let successful_downloads =
+    list.filter(download_results, fn(result) {
+      case result {
+        Ok(_) -> True
+        Error(_) -> False
+      }
+    })
+  let failed_downloads =
+    list.filter(download_results, fn(result) {
+      case result {
+        Ok(_) -> False
+        Error(_) -> True
+      }
+    })
+
+  wisp.log_info(
+    "Successfully fetched downloads for "
+    <> int.to_string(list.length(successful_downloads))
+    <> " packages",
+  )
+  wisp.log_info(
+    "Failed to fetch downloads for "
+    <> int.to_string(list.length(failed_downloads))
+    <> " packages",
+  )
 
   let _ =
     list.each(download_results, fn(result) {
@@ -455,18 +566,31 @@ fn get_list_gleam_packages_sqlite(conn: sqlight.Connection) {
   let sql =
     "SELECT DISTINCT package_name FROM packages ORDER BY downloads_all_time DESC"
 
+  echo "Executing SQL query: " <> sql
+
+  // let raw_result =
+  //   sqlight.query(sql, on: conn, with: [], expecting: decode.dynamic)
+  // echo "Raw query result:"
+  // echo raw_result
+
   use packages <- result.try(
-    sqlight.query(sql, on: conn, with: [], expecting: decode.string)
+    sqlight.query(
+      sql,
+      on: conn,
+      with: [],
+      expecting: decode.at([0], decode.string),
+    )
     |> result.map_error(error.DatabaseError),
   )
 
+  echo "Decoded packages count: " <> int.to_string(list.length(packages))
   Ok(packages)
 }
 
 fn insert_package_daily_downloads_sqlite(
   package_result: Result(hexpm.Package, Error),
   conn: sqlight.Connection,
-) {
+) -> Result(Nil, Error) {
   case package_result {
     Ok(package) -> {
       let downloads_yesterday =
@@ -496,21 +620,39 @@ fn insert_package_daily_downloads_sqlite(
         ) VALUES (?, ?, ?, ?)
         "
 
-      sqlight.query(
-        sql,
-        on: conn,
-        with: [
-          sqlight.text(package.name),
-          sqlight.text(date),
-          sqlight.int(downloads_yesterday),
-          sqlight.text(inserted_at),
-        ],
-        expecting: decode.dynamic,
-      )
-      |> result.map(fn(_) { Nil })
-      |> result.unwrap(Nil)
+      case
+        sqlight.query(
+          sql,
+          on: conn,
+          with: [
+            sqlight.text(package.name),
+            sqlight.text(date),
+            sqlight.int(downloads_yesterday),
+            sqlight.text(inserted_at),
+          ],
+          expecting: decode.dynamic,
+        )
+      {
+        Ok(_) -> {
+          wisp.log_info("Inserted daily downloads for: " <> package.name)
+          Ok(Nil)
+        }
+        Error(err) -> {
+          wisp.log_error(
+            "Failed to insert daily downloads for " <> package.name,
+          )
+          echo err
+          Error(error.DatabaseError(err))
+        }
+      }
     }
-    Error(_) -> Nil
+    Error(err) -> {
+      wisp.log_error(
+        "Package result error in insert_package_daily_downloads_sqlite",
+      )
+      echo err
+      Error(err)
+    }
   }
 }
 

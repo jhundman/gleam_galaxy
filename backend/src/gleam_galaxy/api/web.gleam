@@ -3,7 +3,7 @@ import gleam/erlang/process
 import gleam/http
 import gleam/json
 import gleam/list
-
+import gleam/option
 import gleam/string
 import gleam/string_tree
 import gleam_galaxy/api/service
@@ -136,7 +136,7 @@ fn start_cron(
 }
 
 fn get_package(pkg: String, conn: sqlight.Connection) -> Response {
-  echo "Fetching package" <> pkg
+  echo "Fetching package " <> pkg
   case get_package_header(pkg, conn) {
     Ok(package_header) -> {
       let package_history = get_package_history(pkg, conn)
@@ -169,23 +169,12 @@ fn get_package_header(
   WHERE p.package_name = ?;
   "
 
-  let string_to_list = fn(data) {
-    let decoder =
-      decode.string
-      |> decode.map(fn(str) {
-        case str {
-          "" -> []
-          _ -> string.split(str, ",")
-        }
-      })
-    decode.run(data, decoder)
-  }
-
   let string_list_decoder =
-    decode.new_primitive_decoder("StringList", fn(data) {
-      case string_to_list(data) {
-        Ok(list) -> Ok(list)
-        Error(_) -> Error([])
+    decode.optional(decode.string)
+    |> decode.map(fn(opt_str) {
+      case opt_str {
+        option.None | option.Some("") -> []
+        option.Some(str) -> string.split(str, ",")
       }
     })
 
