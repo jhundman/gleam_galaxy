@@ -68,8 +68,8 @@ fn sync_data(state: State) -> Nil {
   )
 
   // // Sync Updates
-  // wisp.log_info("===== Sync Updates =====")
-  // let _ = sync_updates(state)
+  wisp.log_info("===== Sync Updates =====")
+  let _ = sync_updates(state)
 
   // Sync Downloads
   wisp.log_info("===== Sync Downloads =====")
